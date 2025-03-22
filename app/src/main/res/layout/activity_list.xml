@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/lists_bg"
+    android:orientation="vertical">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="?attr/colorPrimary"
+        app:title="SyncMart"
+        app:titleTextColor="@android:color/white" />
+
+    <!-- Tab Layout for Switching Between Fragments -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:tabGravity="fill"
+        app:tabIndicatorColor="@android:color/white"
+        app:tabMode="fixed"
+        app:tabSelectedTextColor="@android:color/black"
+        app:tabTextColor="@android:color/white"
+        tools:ignore="SpeakableTextPresentCheck" />
+
+    <!-- RelativeLayout to Overlay ImageButton on ViewPager2 -->
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- ViewPager2 for Swiping Between Fragments -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/viewPager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Floating ImageButton in the Lower Right Corner -->
+        <ImageButton
+            android:id="@+id/addElementButton"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="true"
+            android:layout_margin="26dp"
+            android:background="@drawable/circ_btn_bg"
+            android:contentDescription="@string/add"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_add"
+            tools:ignore="ImageContrastCheck" />
+
+        <ImageButton
+            android:id="@+id/shareListButton"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="true"
+            android:layout_marginEnd="26dp"
+            android:layout_marginBottom="104dp"
+            android:background="@drawable/circ_btn_bg"
+            android:contentDescription="@string/add"
+            android:scaleType="centerInside"
+            android:src="@drawable/ic_share"
+            tools:ignore="ImageContrastCheck,DuplicateSpeakableTextCheck" />
+
+
+    </RelativeLayout>
+
+</LinearLayout>

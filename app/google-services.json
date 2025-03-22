@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "61170465939",
+    "project_id": "syncmart-2db9f",
+    "storage_bucket": "syncmart-2db9f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:61170465939:android:907bded8fe67a3252aa166",
+        "android_client_info": {
+          "package_name": "com.mana.syncmart"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDDg2PtTzetXLD1w_Yy_SrYc9otTFmFBfI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

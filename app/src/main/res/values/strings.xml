@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">SyncMart</string>
+    <string name="hint_email">Enter E-Mail</string>
+    <string name="hint_password">Enter password (6 characters)</string>
+    <string name="btn_login">Login</string>
+    <string name="btn_register">Register</string>
+    <string name="title_login">LOGIN</string>
+    <string name="title_register">REGISTER</string>`
+    <string name="new_user_prompt">New User?</string>
+    <string name="register_prompt">Register</string>
+    <string name="old_user_prompt">Already have an account?</string>
+    <string name="login_prompt">Login</string>
+    <string name="error_empty_fields">Please enter email and password.</string>
+    <string name="error_invalid_credentials">E-Mail/Password Incorrect.</string>
+    <string name="error_user_not_exist">User does not exist. Please Register.</string>
+    <string name="login_success">Login Successful!</string>
+    <string name="registration_failed">Registration Failed. Try again.</string>
+    <string name="logout">Logout</string>
+    <string name="title_shopping_list">Shopping List</string>
+    <string name="add">+</string>
+    <string name="dialog_list_name">List Name:</string>
+    <string name="delete">Delete</string>
+    <string name="settings">Settings</string>
+    <string name="empty_list_management">No lists available for you right now\nCreate a new list!</string>
+    <string name="enter_email">Enter E-Mails (Comma separated)</string>
+    <string name="create">Create</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Are you sure?</string>
+    <string name="modify_create">Modify/Create</string>
+    <string name="list_members">Select Members</string>
+    <string name="tick">Tick</string>
+    <string name="pending_items">Pending Items</string>
+    <string name="finished_items">Finished Items</string>
+    <string name="friendless">You have no friends added. Add friends to see them here.</string>
+    <string name="friends">Friends</string>
+    <string name="welcome_message">Welcome, %1$s</string>
+    <string name="add_friend">Add Friend</string>
+
+
+    <!-- Firebase Configurations -->
+    <string name="firebase_api_key">YOUR_FIREBASE_API_KEY_HERE</string>
+    <string name="firebase_database_url">YOUR_FIREBASE_DATABASE_URL_HERE</string>
+
+</resources>
+
+
+
+
+

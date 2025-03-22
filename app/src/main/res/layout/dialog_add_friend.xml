@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:background="@drawable/dialog_bg"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    tools:ignore="VisualLintBounds">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/textView7"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:padding="2dp"
+            android:text="@string/add_friend"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <EditText
+            android:id="@+id/editTextFriendName"
+            android:layout_width="300dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="20dp"
+            android:autofillHints="Enter List Name"
+            android:background="@drawable/multiline_items"
+            android:padding="2dp"
+            android:textAlignment="center"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/textView7"
+            tools:ignore="LabelFor,TextFields,SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+
+        <EditText
+            android:id="@+id/editTextFriendEmail"
+            android:layout_width="300dp"
+            android:layout_height="30dp"
+            android:layout_marginTop="10dp"
+            android:autofillHints="Enter List Name"
+            android:background="@drawable/multiline_items"
+            android:padding="2dp"
+            android:textAlignment="center"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/editTextFriendName"
+            tools:ignore="LabelFor,TextFields,SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+
+        <Button
+            android:id="@+id/btnAdd"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/green_blue_bg"
+            android:shadowColor="#000000"
+            android:shadowRadius="20"
+            android:text="@string/add_friend"
+            android:textColor="#FFFFFF"
+            android:layout_marginTop="20dp"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            app:backgroundTint="@null"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/editTextFriendEmail"
+            tools:ignore="TextContrastCheck" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</LinearLayout>
