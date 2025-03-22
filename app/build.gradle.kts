@@ -64,6 +64,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.material)
+    implementation(libs.circleimageview)
 
 }
 
