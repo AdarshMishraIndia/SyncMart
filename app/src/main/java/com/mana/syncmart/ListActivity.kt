@@ -28,6 +28,7 @@ import com.mana.syncmart.databinding.ActivityListBinding
 // 🔹 Date & Time Handling
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.core.content.edit
 
 class ListActivity : AppCompatActivity() {
 
@@ -72,7 +73,7 @@ class ListActivity : AppCompatActivity() {
 
         if (lastClearedDate != currentDate) {
             clearFinishedItemsForAllLists()
-            sharedPreferences.edit().putString("lastClearedDate", currentDate).apply()
+            sharedPreferences.edit { putString("lastClearedDate", currentDate) }
         }
     }
 
@@ -84,12 +85,6 @@ class ListActivity : AppCompatActivity() {
                         "finishedItems" to arrayListOf<String>(), // ✅ Ensures the field exists
                         "pendingItems" to FieldValue.arrayUnion() // 🔥 Keeps `pendingItems` intact
                     ))
-                        .addOnSuccessListener {
-                            showCustomToast("✅ Finished items cleared successfully!")
-                        }
-                        .addOnFailureListener {
-                            showCustomToast("❌ Unable to clear finished items. Please try again.")
-                        }
                 }
             }
     }
@@ -194,9 +189,10 @@ class ListActivity : AppCompatActivity() {
 
         val toast = Toast(this)
         toast.duration = Toast.LENGTH_LONG
-        toast.setGravity(Gravity.BOTTOM, 0, 200)
+        toast.setGravity(Gravity.CENTER, 0, 0) // ✅ Center toast on screen
         toast.view = layout
 
         toast.show()
     }
+
 }

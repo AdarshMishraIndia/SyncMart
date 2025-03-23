@@ -15,7 +15,7 @@ import androidx.core.content.ContextCompat
 import com.mana.syncmart.databinding.FriendsLayoutBinding
 
 class FriendSelectionAdapter(
-    context: Context,
+    private val context: Context,
     private val friendsList: List<Friend>,
     private val selectedEmails: MutableSet<String>,
     private val onFriendChecked: (Friend, Boolean) -> Unit,

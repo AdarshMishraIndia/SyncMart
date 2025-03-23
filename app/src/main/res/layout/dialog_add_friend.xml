@@ -33,6 +33,7 @@
             android:id="@+id/editTextFriendName"
             android:layout_width="300dp"
             android:layout_height="30dp"
+            android:hint="Enter Name"
             android:layout_marginTop="20dp"
             android:autofillHints="Enter List Name"
             android:background="@drawable/multiline_items"
@@ -41,7 +42,7 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/textView7"
-            tools:ignore="LabelFor,TextFields,SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+            tools:ignore="HardcodedText,LabelFor,SpeakableTextPresentCheck,TextFields,TouchTargetSizeCheck" />
 
         <EditText
             android:id="@+id/editTextFriendEmail"
@@ -51,11 +52,12 @@
             android:autofillHints="Enter List Name"
             android:background="@drawable/multiline_items"
             android:padding="2dp"
+            android:hint="Enter E-Mail"
             android:textAlignment="center"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/editTextFriendName"
-            tools:ignore="LabelFor,TextFields,SpeakableTextPresentCheck,TouchTargetSizeCheck" />
+            tools:ignore="HardcodedText,LabelFor,SpeakableTextPresentCheck,TextFields,TouchTargetSizeCheck" />
 
         <Button
             android:id="@+id/btnAdd"

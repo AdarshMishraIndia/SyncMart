@@ -38,7 +38,7 @@ class ListManagementActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         setupRecyclerView()
-        fetchShoppingLists() // ✅ Fetch lists where user is either in accessEmails OR owner
+        fetchShoppingLists()
 
         setSupportActionBar(binding.toolbar)
 
@@ -46,26 +46,32 @@ class ListManagementActivity : AppCompatActivity() {
         val navView = binding.navigationView
 
         supportActionBar?.apply {
-            setDisplayHomeAsUpEnabled(true)  // Enable the home button
-            setHomeAsUpIndicator(R.drawable.ic_menu) // Set hamburger icon
-            title = "SyncMart"  // Ensure title is set
+            setDisplayHomeAsUpEnabled(true)
+            setHomeAsUpIndicator(R.drawable.ic_menu)
+            title = "SyncMart"
         }
+
+        // ✅ Update menu item to show "Friends" instead of "Lists"
+        val navMenu = navView.menu
+        val toggleItem = navMenu.findItem(R.id.nav_friends_and_lists)
+        toggleItem.title = getString(R.string.friends) // ✅ Change text to "Friends"
+        toggleItem.setIcon(R.drawable.ic_friends) // ✅ Change icon to ic_friends
 
         // ✅ Open drawer when clicking hamburger icon
         binding.toolbar.setNavigationOnClickListener {
             drawerLayout.openDrawer(GravityCompat.START)
         }
 
-        // ✅ Handle navigation drawer item clicks
+        // ✅ Handle navigation drawer clicks
         navView.setNavigationItemSelectedListener { menuItem ->
             when (menuItem.itemId) {
-                R.id.nav_friends -> {
-                    drawerLayout.closeDrawer(GravityCompat.START) // Close drawer
-                    startActivity(Intent(this, FriendActivity::class.java)) // Open FriendActivity
+                R.id.nav_friends_and_lists -> {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    startActivity(Intent(this, FriendActivity::class.java))
                     true
                 }
                 R.id.nav_logout -> {
-                    drawerLayout.closeDrawer(GravityCompat.START) // Close drawer before logging out
+                    drawerLayout.closeDrawer(GravityCompat.START)
                     logoutUser()
                     true
                 }
@@ -77,6 +83,7 @@ class ListManagementActivity : AppCompatActivity() {
             showModifyDialog(null, isEditing = false)
         }
     }
+
 
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {

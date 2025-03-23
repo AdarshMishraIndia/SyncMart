@@ -2,30 +2,32 @@ package com.mana.syncmart
 
 import android.os.Bundle
 import android.util.Log
+import android.view.Gravity
 import android.view.View
-import android.widget.ListView
-import android.widget.TextView
-import android.widget.Toast
+import android.widget.*
 import android.content.Intent
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.Toolbar
-import com.google.firebase.auth.FirebaseAuth
+import androidx.core.view.GravityCompat
+import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.*
+import androidx.appcompat.app.AlertDialog
 
+
+@Suppress("DEPRECATION")
 class FriendActivity : AppCompatActivity() {
 
     private lateinit var listView: ListView
     private lateinit var adapter: FriendSelectionAdapter
     private lateinit var emptyStateText: TextView
     private lateinit var toolbarText: TextView
+    private lateinit var btnAdd: ImageButton
 
-    private val selectedEmails = mutableSetOf<String>() // To track selected friends
     private val friendsList = mutableListOf<Friend>()
 
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
-    private var userEmail: String? = null
     private var listenerRegistration: ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,21 +37,93 @@ class FriendActivity : AppCompatActivity() {
         // Setup Toolbar
         val toolbar: Toolbar = findViewById(R.id.toolbar)
         setSupportActionBar(toolbar)
-        supportActionBar?.title = "SyncMart"
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.setHomeButtonEnabled(true)
+        supportActionBar?.apply {
+            title = "SyncMart"
+            setDisplayHomeAsUpEnabled(true)
+            setHomeButtonEnabled(true)
+        }
+
+        // Initialize DrawerLayout and NavigationView
+        val drawerLayout: DrawerLayout = findViewById(R.id.drawer_layout)
+        val navigationView: NavigationView = findViewById(R.id.navigation_view)
+
+        toolbar.setNavigationOnClickListener {
+            drawerLayout.openDrawer(GravityCompat.START)
+        }
+
+        val navMenu = navigationView.menu
+        val toggleItem = navMenu.findItem(R.id.nav_friends_and_lists)
+        toggleItem.title = getString(R.string.lists)
+        toggleItem.setIcon(R.drawable.ic_lists)
+
+        navigationView.setNavigationItemSelectedListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.nav_friends_and_lists -> {
+                    val intent = Intent(this, ListManagementActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
+                    finish()
+                }
+                R.id.nav_logout -> {
+                    AuthUtils.logout(this)
+                }
+            }
+            drawerLayout.closeDrawer(GravityCompat.START)
+            true
+        }
 
         // Get references
         listView = findViewById(R.id.friendListView)
         emptyStateText = findViewById(R.id.emptyStateText)
         toolbarText = findViewById(R.id.toolbar_user)
+        btnAdd = findViewById(R.id.addFriendButton)
 
-        // Get logged-in user email
-        userEmail = auth.currentUser?.email
+        // ✅ Get the currently logged-in user
+        val user = AuthUtils.getCurrentUser()
+        if (user != null) {
+            val userEmail = user.email
+            if (userEmail != null) {
+                fetchUserName(userEmail)
+                listenForFriendsUpdates(userEmail)
 
-        if (userEmail != null) {
-            fetchUserName(userEmail!!) // Fetch and display user's name
-            listenForFriendsUpdates(userEmail!!)
+                // Handle Add Friend Button Click
+                btnAdd.setOnClickListener {
+                    val dialogView = layoutInflater.inflate(R.layout.dialog_add_friend, null)
+
+                    val etFriendEmail = dialogView.findViewById<EditText>(R.id.editTextFriendEmail)
+                    val etFriendName = dialogView.findViewById<EditText>(R.id.editTextFriendName)
+                    val btnDialogAdd = dialogView.findViewById<Button>(R.id.btnAdd) // Get button from XML
+
+                    val dialog = AlertDialog.Builder(this)
+                        .setView(dialogView)
+                        .create()
+
+                    dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+                    btnDialogAdd.setOnClickListener {
+                        val friendEmail = etFriendEmail.text.toString().trim()
+                        val friendName = etFriendName.text.toString().trim()
+
+                        if (friendEmail.isEmpty() || friendName.isEmpty()) {
+                            showCustomToast("Both fields are required!")
+                        } else {
+                            val user = AuthUtils.getCurrentUser()
+                            if (user != null && user.email != null) {
+                                addFriendToFirestore(user.email!!, friendEmail, friendName)
+                                dialog.dismiss() // Dismiss dialog after adding friend
+                            } else {
+                                showCustomToast("User not logged in!")
+                            }
+                        }
+                    }
+
+                    dialog.show()
+                }
+
+
+            } else {
+                Toast.makeText(this, "Failed to retrieve email!", Toast.LENGTH_SHORT).show()
+            }
         } else {
             Toast.makeText(this, "User not logged in!", Toast.LENGTH_SHORT).show()
         }
@@ -73,8 +147,8 @@ class FriendActivity : AppCompatActivity() {
             .addOnSuccessListener { document ->
                 if (document.exists()) {
                     val fullName = document.getString("name") ?: email
-                    val firstName = fullName.split(" ").firstOrNull() ?: fullName // Extract first word
-                    toolbarText.text = getString(R.string.welcome_message, firstName) // Display first name
+                    val firstName = fullName.split(" ").firstOrNull() ?: fullName
+                    toolbarText.text = getString(R.string.welcome_message, firstName)
                 } else {
                     toolbarText.text = getString(R.string.welcome_message, email)
                 }
@@ -85,8 +159,6 @@ class FriendActivity : AppCompatActivity() {
             }
     }
 
-
-
     /**
      * Listen for changes in Firestore and update ListView in real-time
      */
@@ -94,7 +166,7 @@ class FriendActivity : AppCompatActivity() {
         listenerRegistration = db.collection("Users")
             .document(email)
             .addSnapshotListener { snapshot, error ->
-            if (error != null) {
+                if (error != null) {
                     Log.e("Firestore", "Error fetching data", error)
                     return@addSnapshotListener
                 }
@@ -102,17 +174,17 @@ class FriendActivity : AppCompatActivity() {
                 if (snapshot != null && snapshot.exists()) {
                     val friendsMap = snapshot.get("friendsMap") as? Map<*, *>
                     val validFriendsMap: Map<String, String> = friendsMap
-                        ?.filterKeys { it is String }  // Ensure keys are Strings
+                        ?.filterKeys { it is String }
                         ?.mapNotNull { (key, value) ->
                             if (key is String && value is String) key to value else null
-                        } // Ensure values are also Strings
+                        }
                         ?.toMap()
                         ?: emptyMap()
 
                     if (validFriendsMap.isEmpty()) {
                         showEmptyState()
                     } else {
-                        updateListView(validFriendsMap) // Pass the correctly typed map
+                        updateListView(validFriendsMap)
                     }
                 } else {
                     showEmptyState()
@@ -120,44 +192,97 @@ class FriendActivity : AppCompatActivity() {
             }
     }
 
+    /**
+     * Add friend to Firestore database
+     */
+    private fun addFriendToFirestore(userEmail: String, friendEmail: String, friendName: String) {
+        val userDocRef = db.collection("Users").document(userEmail)
+
+        userDocRef.get().addOnSuccessListener { document ->
+            if (document.exists()) {
+                val rawMap = document.get("friendsMap") as? Map<*, *>
+                val friendsMap = rawMap
+                    ?.filterKeys { it is String } // Ensure keys are Strings
+                    ?.filterValues { it is String } // Ensure values are Strings
+                    ?.mapKeys { it.key as String } // Cast keys to String
+                    ?.mapValues { it.value as String } // Cast values to String
+                    ?.toMutableMap() ?: mutableMapOf()
+
+                friendsMap[friendEmail] = friendName
+
+                userDocRef.update("friendsMap", friendsMap)
+                    .addOnFailureListener {
+                        showCustomToast("Failed to add friend!")
+                    }
+            }
+
+
+        }.addOnFailureListener {
+            showCustomToast("Error retrieving user data!")
+        }
+    }
 
     /**
-     * Update ListView with friends list using custom adapter
+     * Show custom toast message
      */
-    private fun updateListView(friendsMap: Map<String, String>) {
-        friendsList.clear()
-        for ((email, name) in friendsMap) {
-            friendsList.add(Friend(name, email)) // Convert Map to Friend objects
-        }
+    private fun showCustomToast(message: String) {
+        val inflater = layoutInflater
+        val layout: View = inflater.inflate(R.layout.custom_toast_layout, findViewById(R.id.toast_text))
+        val text: TextView = layout.findViewById(R.id.toast_text)
+        text.text = message
 
-        // Initialize adapter if not already done
-        if (!::adapter.isInitialized) {
-            adapter = FriendSelectionAdapter(this, friendsList, selectedEmails, { _, _ -> }, false) // 🔹 Pass `false` to hide checkboxes
-            listView.adapter = adapter
-        } else {
-            adapter.notifyDataSetChanged()
-        }
-
-
-        listView.visibility = View.VISIBLE
-        emptyStateText.visibility = View.GONE
+        val toast = Toast(applicationContext)
+        toast.setGravity(Gravity.CENTER, 0, 0)
+        toast.duration = Toast.LENGTH_SHORT
+        toast.view = layout
+        toast.show()
     }
 
     /**
      * Show empty state when there are no friends
      */
     private fun showEmptyState() {
-        friendsList.clear()
-        if (::adapter.isInitialized) { // Prevent crash if adapter is not initialized
-            adapter.notifyDataSetChanged()
-        }
-        listView.visibility = View.GONE
         emptyStateText.visibility = View.VISIBLE
+        listView.visibility = View.GONE
     }
+
+    /**
+     * Update the ListView with the latest friends data
+     */
+    private fun updateListView(friendsMap: Map<String, String>) {
+        friendsList.clear()
+
+        for ((email, name) in friendsMap) {
+            friendsList.add(Friend(name, email)) // Assuming you have a Friend data class
+        }
+
+        if (::adapter.isInitialized) {
+            adapter.notifyDataSetChanged()
+        } else {
+            adapter = FriendSelectionAdapter(
+                this,
+                friendsList,
+                selectedEmails = mutableSetOf(), // ✅ Removed selection tracking
+                showCheckBox = false,
+                onFriendChecked = { _, _ -> } // ✅ No checkbox interaction needed
+            )
+
+
+            listView.adapter = adapter
+        }
+
+        // Show or hide the empty state
+        if (friendsList.isEmpty()) {
+            showEmptyState()
+        } else {
+            emptyStateText.visibility = View.GONE
+            listView.visibility = View.VISIBLE
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
-        listenerRegistration?.remove() // Clean up Firestore listener
+        listenerRegistration?.remove()
     }
-
 }
