@@ -12,6 +12,9 @@ import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.firestore.FieldValue
 
 class LoginActivity : ComponentActivity() {
 
@@ -58,6 +61,18 @@ class LoginActivity : ComponentActivity() {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
+                    val userId = email
+                    val userDocRef = FirebaseFirestore.getInstance().collection("Users").document(userId)
+
+                    // Get and update FCM Token
+                    FirebaseMessaging.getInstance().token
+                        .addOnCompleteListener { tokenTask ->
+                            if (tokenTask.isSuccessful) {
+                                val token = tokenTask.result
+                                userDocRef.update("tokens", FieldValue.arrayUnion(token))
+                            }
+                        }
+
                     showCustomToast("✅ Login Successful")
                     startActivity(Intent(this, ListManagementActivity::class.java))
                     finish()

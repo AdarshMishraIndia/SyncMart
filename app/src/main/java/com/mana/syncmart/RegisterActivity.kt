@@ -11,6 +11,9 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.firestore.FieldValue
 
 class RegisterActivity : ComponentActivity() {
 
@@ -57,6 +60,32 @@ class RegisterActivity : ComponentActivity() {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
+                    val userId = email
+                    val userDocRef = FirebaseFirestore.getInstance().collection("Users").document(userId)
+
+                    // Generate FCM Token
+                    FirebaseMessaging.getInstance().token
+                        .addOnCompleteListener { tokenTask ->
+                            if (tokenTask.isSuccessful) {
+                                val token = tokenTask.result
+
+                                // Check if user already exists in Firestore
+                                userDocRef.get().addOnSuccessListener { document ->
+                                    if (document.exists()) {
+                                        // If user exists, update tokens array
+                                        userDocRef.update("tokens", FieldValue.arrayUnion(token))
+                                    } else {
+                                        // If new user, create document
+                                        val userData = hashMapOf(
+                                            "friendsMap" to hashMapOf<String, String>(), // Empty map
+                                            "tokens" to listOf(token) // Store token in array
+                                        )
+                                        userDocRef.set(userData)
+                                    }
+                                }
+                            }
+                        }
+
                     showCustomToast("✅ Registration Successful")
                     startActivity(Intent(this, ListManagementActivity::class.java))
                     finish()

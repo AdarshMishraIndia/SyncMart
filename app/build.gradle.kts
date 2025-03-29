@@ -65,6 +65,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.material)
     implementation(libs.circleimageview)
+    implementation(libs.firebase.messaging)
 
 }
 
