@@ -2,75 +2,106 @@ package com.mana.syncmart
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
-import android.view.View
 
 class ListAdapter(
     private var list: List<ShoppingList>,
-    private val onDeleteClicked: (String) -> Unit,
-    private val onModifyClicked: (ShoppingList) -> Unit, // Callback for modifying the list
-    private val onListClicked: (ShoppingList) -> Unit, // ✅ Callback for list click
-    private val loggedInUserEmail: String // Add logged-in user email
+    private val onSelectionChanged: (Boolean, Int) -> Unit, // Now includes count for menu
+    private val onListClicked: (ShoppingList) -> Unit
 ) : RecyclerView.Adapter<ListAdapter.ViewHolder>() {
 
-    class ViewHolder(binding: ListRecyclerLayoutBinding) : RecyclerView.ViewHolder(binding.root) {
-        val buttonName: TextView = binding.buttonName
-        val btnDelete: ImageButton = binding.btnDelete
-        val btnSettings: ImageButton = binding.btnSettings
-        val notifBubble: TextView = binding.notifBubble
-    }
+    private val selectedItems = mutableSetOf<String>()
+    private var isSelectionMode = false
+
+    class ViewHolder(val binding: ListRecyclerLayoutBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ListRecyclerLayoutBinding.inflate(LayoutInflater.from(parent.context), parent, false)
         return ViewHolder(binding)
     }
 
-    @SuppressLint("SetTextI18n")
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val listItem = list[position]
-        holder.buttonName.text = listItem.listName.ifEmpty { "Unnamed List" }
+        holder.binding.buttonName.text = listItem.listName.ifEmpty { "Unnamed List" }
 
-        // ✅ Show or hide notification bubble based on pendingItems
-        if (listItem.pendingItems.isNotEmpty()) {
-            holder.notifBubble.visibility = View.VISIBLE
-            holder.notifBubble.text = listItem.pendingItems.size.toString() // Show count
+        // Show or hide notification bubble
+        holder.binding.notifBubble.apply {
+            visibility = if (listItem.pendingItems.isNotEmpty()) View.VISIBLE else View.GONE
+            text = listItem.pendingItems.size.toString()
+        }
+
+        // ✅ Apply selection effect using background drawables
+        if (selectedItems.contains(listItem.id)) {
+            holder.itemView.setBackgroundResource(R.drawable.selected_bg)
         } else {
-            holder.notifBubble.visibility = View.GONE
+            holder.itemView.setBackgroundResource(R.drawable.list_bg)
         }
 
-        // Show buttons only if logged-in user is the owner
-        if (listItem.owner == loggedInUserEmail) {
-            holder.btnDelete.visibility = View.VISIBLE
-            holder.btnSettings.visibility = View.VISIBLE
-        } else {
-            holder.btnDelete.visibility = View.GONE
-            holder.btnSettings.visibility = View.GONE
+        // Click to toggle selection if in selection mode
+        holder.itemView.setOnClickListener {
+            if (isSelectionMode) {
+                toggleSelection(listItem.id)
+            } else {
+                onListClicked(listItem)
+            }
         }
 
-        // ✅ Handle list item click to navigate to ListActivity
-        holder.buttonName.setOnClickListener {
-            onListClicked(listItem)
-        }
-
-        holder.btnDelete.setOnClickListener {
-            onDeleteClicked(listItem.listName)
-        }
-
-        holder.btnSettings.setOnClickListener {
-            onModifyClicked(listItem)
+        // Long press to enable selection mode
+        holder.itemView.setOnLongClickListener {
+            if (!isSelectionMode) {
+                isSelectionMode = true
+                toggleSelection(listItem.id)
+            }
+            true
         }
     }
+
+
 
 
     override fun getItemCount(): Int = list.size
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateList(newList: List<ShoppingList>) {
-        list = newList
+    private fun toggleSelection(listId: String) {
+        if (selectedItems.contains(listId)) {
+            selectedItems.remove(listId)
+        } else {
+            selectedItems.add(listId)
+        }
+
+        // If nothing is selected, exit selection mode
+        isSelectionMode = selectedItems.isNotEmpty()
+
+        // **Ensure UI updates**
+        onSelectionChanged(isSelectionMode, selectedItems.size)
         notifyDataSetChanged()
     }
+
+
+
+    fun getSelectedItems(): List<String> = selectedItems.toList()
+
+    fun isSelectionModeActive(): Boolean {
+        return isSelectionMode
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun clearSelection() {
+        selectedItems.clear()
+        isSelectionMode = false
+        onSelectionChanged(false, 0) // Reset toolbar UI
+        notifyDataSetChanged()
+    }
+
+
+    @SuppressLint("NotifyDataSetChanged")
+    fun updateList(newLists: List<ShoppingList>) {
+        list = newLists // Update the list reference
+        notifyDataSetChanged() // Notify adapter of dataset change
+    }
+
+
 }

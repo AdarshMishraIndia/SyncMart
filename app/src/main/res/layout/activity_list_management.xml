@@ -5,12 +5,12 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/drawer_layout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@drawable/lists_bg">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@drawable/lists_bg"
         android:orientation="vertical">
 
         <androidx.constraintlayout.widget.ConstraintLayout
@@ -18,7 +18,7 @@
             android:layout_height="match_parent"
             android:fitsSystemWindows="true">
 
-            <!-- Toolbar with Hamburger -->
+            <!-- Toolbar with App Title, Welcome Text & Selection Menu -->
             <androidx.appcompat.widget.Toolbar
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
@@ -27,8 +27,48 @@
                 app:layout_constraintTop_toTopOf="parent"
                 app:navigationIcon="@drawable/ic_menu"
                 app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-                app:title="SyncMart"
-                app:titleTextColor="@android:color/white" />
+                app:titleTextColor="@android:color/white">
+
+                <androidx.constraintlayout.widget.ConstraintLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <!-- App Title -->
+                    <TextView
+                        android:id="@+id/toolbar_title"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="10dp"
+                        android:text="SyncMart"
+                        android:textColor="@android:color/white"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:shadowRadius="10"
+                        android:shadowColor="@color/black"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        app:layout_constraintStart_toStartOf="parent"
+                        app:layout_constraintTop_toTopOf="parent"
+                        tools:ignore="HardcodedText" />
+
+                    <!-- Welcome Text -->
+                    <TextView
+                        android:id="@+id/toolbar_user"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:padding="5dp"
+                        android:text="Welcome, Adarsh"
+                        android:textColor="#FFFF00"
+                        android:shadowRadius="10"
+                        android:shadowColor="@color/black"
+                        android:textSize="16sp"
+                        android:textStyle="bold"
+                        app:layout_constraintEnd_toEndOf="parent"
+                        app:layout_constraintBottom_toBottomOf="parent"
+                        tools:ignore="HardcodedText" />
+
+                </androidx.constraintlayout.widget.ConstraintLayout>
+
+            </androidx.appcompat.widget.Toolbar>
 
             <TextView
                 android:id="@+id/emptyStateText"
@@ -52,10 +92,11 @@
                 android:layout_height="0dp"
                 android:padding="16dp"
                 android:scrollbars="vertical"
-                app:layout_constraintTop_toBottomOf="@+id/toolbar"
                 app:layout_constraintBottom_toTopOf="@+id/floatingActionButton"
+                app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintEnd_toEndOf="parent"/>
+                app:layout_constraintTop_toBottomOf="@+id/toolbar"
+                tools:ignore="SpeakableTextPresentCheck" />
 
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/floatingActionButton"
@@ -80,6 +121,7 @@
         android:layout_height="match_parent"
         android:layout_gravity="start"
         app:menu="@menu/drawer_menu"
-        tools:ignore="VisualLintBounds"
-        app:headerLayout="@layout/nav_header"/>
+        app:headerLayout="@layout/nav_header"
+        tools:ignore="VisualLintBounds" />
+
 </androidx.drawerlayout.widget.DrawerLayout>
