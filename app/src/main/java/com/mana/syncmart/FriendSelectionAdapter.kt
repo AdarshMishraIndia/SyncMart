@@ -15,18 +15,24 @@ import androidx.core.content.ContextCompat
 import com.mana.syncmart.databinding.FriendsLayoutBinding
 
 class FriendSelectionAdapter(
-    private val context: Context,
+    context: Context,
     private val friendsList: List<Friend>,
     private val selectedEmails: MutableSet<String>,
     private val onFriendChecked: (Friend, Boolean) -> Unit,
-    private val showCheckBox: Boolean  // 🔹 Added flag to control checkbox visibility
+    private val showCheckBox: Boolean
 ) : ArrayAdapter<Friend>(context, R.layout.friends_layout, friendsList) {
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val binding: FriendsLayoutBinding = if (convertView == null) {
-            FriendsLayoutBinding.inflate(LayoutInflater.from(context), parent, false)
+        val binding: FriendsLayoutBinding
+        val view: View
+
+        if (convertView == null) {
+            binding = FriendsLayoutBinding.inflate(LayoutInflater.from(context), parent, false)
+            view = binding.root
+            view.tag = binding // Store binding in tag for reuse
         } else {
-            FriendsLayoutBinding.bind(convertView)
+            binding = convertView.tag as FriendsLayoutBinding
+            view = convertView
         }
 
         val friend = friendsList[position]
@@ -41,10 +47,11 @@ class FriendSelectionAdapter(
         }
         binding.textViewNameEmail.text = spannable
 
-        // ✅ Show or hide checkbox based on `showCheckBox` flag
+        // ✅ Show or hide checkbox
+        binding.checkBox.visibility = if (showCheckBox) View.VISIBLE else View.GONE
+
         if (showCheckBox) {
-            binding.checkBox.visibility = View.VISIBLE
-            binding.checkBox.setOnCheckedChangeListener(null) // Prevent recycling issues
+            binding.checkBox.setOnCheckedChangeListener(null) // Prevent incorrect state
             binding.checkBox.isChecked = selectedEmails.contains(friend.email)
             updateCheckboxColor(binding.checkBox, binding.checkBox.isChecked)
 
@@ -53,15 +60,15 @@ class FriendSelectionAdapter(
                 if (isChecked) selectedEmails.add(friend.email) else selectedEmails.remove(friend.email)
                 onFriendChecked(friend, isChecked)
             }
-        } else {
-            binding.checkBox.visibility = View.GONE
         }
 
-        return binding.root
+        return view
     }
+
 
     private fun updateCheckboxColor(checkBox: CheckBox, isChecked: Boolean) {
         val colorResId = if (isChecked) R.color.green else R.color.red
         checkBox.buttonTintList = ColorStateList.valueOf(ContextCompat.getColor(context, colorResId))
     }
+
 }

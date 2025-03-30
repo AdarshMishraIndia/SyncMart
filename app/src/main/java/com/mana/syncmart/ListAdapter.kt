@@ -33,11 +33,15 @@ class ListAdapter(
             text = listItem.pendingItems.size.toString()
         }
 
-        // ✅ Apply selection effect using background drawables
-        if (selectedItems.contains(listItem.id)) {
-            holder.itemView.setBackgroundResource(R.drawable.selected_bg)
-        } else {
-            holder.itemView.setBackgroundResource(R.drawable.list_bg)
+        // Get logged-in user's email
+        val loggedInUserEmail = AuthUtils.getCurrentUser()?.email
+
+
+        // Determine background based on ownership and selection status
+        when {
+            selectedItems.contains(listItem.id) -> holder.itemView.setBackgroundResource(R.drawable.selected_bg)
+            listItem.owner == loggedInUserEmail -> holder.itemView.setBackgroundResource(R.drawable.list_bg_owner)
+            else -> holder.itemView.setBackgroundResource(R.drawable.list_bg)
         }
 
         // Click to toggle selection if in selection mode
@@ -58,8 +62,6 @@ class ListAdapter(
             true
         }
     }
-
-
 
 
     override fun getItemCount(): Int = list.size
