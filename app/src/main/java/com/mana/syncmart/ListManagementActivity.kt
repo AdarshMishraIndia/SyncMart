@@ -86,7 +86,7 @@ class ListManagementActivity : AppCompatActivity() {
     }
 
     private fun fetchUserName() {
-        val userEmail = auth.currentUser?.email // Use email instead of UID
+        val userEmail = auth.currentUser?.email
 
         if (userEmail.isNullOrEmpty()) {
             Log.e("FirestoreError", "User email is null, cannot fetch profile")
@@ -94,16 +94,18 @@ class ListManagementActivity : AppCompatActivity() {
             return
         }
 
-        Log.d("FirestoreDebug", "Fetching user profile for Email: $userEmail")
+        // 🔹 Log email before fetching document
+        Log.d("FirestoreDebug", "Fetching user profile for email: $userEmail")
 
         db.collection("Users").document(userEmail).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
+                    Log.d("FirestoreDebug", "Document found: ${document.data}")
                     userName = document.getString("name") ?: "User"
-                    Log.d("FirestoreDebug", "User profile found: $userName")
+                    Log.d("FirestoreDebug", "Fetched user name: $userName")
                     updateToolbarTitle()
                 } else {
-                    Log.e("FirestoreError", "User profile not found in Firestore")
+                    Log.e("FirestoreError", "User document not found for $userEmail")
                     showToast("User profile not found")
                 }
             }
@@ -112,6 +114,7 @@ class ListManagementActivity : AppCompatActivity() {
                 showToast("Failed to fetch user profile")
             }
     }
+
 
 
     @SuppressLint("SetTextI18n")
@@ -124,9 +127,13 @@ class ListManagementActivity : AppCompatActivity() {
         } else {
             binding.toolbarTitle.visibility = View.VISIBLE
             binding.toolbarUser.visibility = View.VISIBLE
-            binding.toolbar.title = "SyncMart"
+
+            // 🔹 Force UI update with userName
+            binding.toolbar.title = "Welcome, $userName"
+            Log.d("UIUpdate", "Toolbar title updated to: Welcome, $userName")
         }
     }
+
 
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -217,10 +224,6 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-
-
-
-
     @SuppressLint("SetTextI18n")
     private fun confirmDeleteSelectedItems() {
         val selectedIds = listAdapter.getSelectedItems()
@@ -249,8 +252,12 @@ class ListManagementActivity : AppCompatActivity() {
                     .addOnSuccessListener {
                         showToast("List deleted")
                         fetchShoppingLists()
-                        listAdapter.clearSelection() // ✅ Deselect all items
-                        toggleSelectionMode(false)  // ✅ Exit selection mode
+
+                        // ✅ Clear selection after last item is deleted
+                        if (selectedIds.last() == docId) {
+                            listAdapter.clearSelection()
+                            toggleSelectionMode(false)
+                        }
                     }
                     .addOnFailureListener {
                         showToast("Failed to delete list")
@@ -331,8 +338,6 @@ class ListManagementActivity : AppCompatActivity() {
             if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
     }
 
-
-
     private fun showModifyDialog(isEditing: Boolean, existingList: ShoppingList? = null) {
         val dialogBinding = DialogModifyListBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(this)
@@ -350,55 +355,44 @@ class ListManagementActivity : AppCompatActivity() {
             dialogBinding.editTextListName.setText(existingList?.listName ?: "")
         }
 
-        val userId = auth.currentUser?.uid
-        if (userId == null) {
-            Log.e("DEBUG", "User ID is null, cannot fetch friends.")
-            showToast("Error: User ID is null")
+        val userEmail = auth.currentUser?.email
+        if (userEmail == null) {
+            Log.e("DEBUG", "User email is null, cannot fetch friends.")
+            showToast("Error: User email is null")
             return
         }
 
-        Log.d("DEBUG", "Fetching friends for userId: $userId")
+        Log.d("DEBUG", "Fetching friends for userEmail: $userEmail")
 
-        // ✅ Fetch friends list from Firestore
-        db.collection("Users").document(userId).get()
-            .addOnSuccessListener { document ->
-                if (!document.exists()) {
+        // ✅ Fetch friends list from Firestore using real-time listener
+        db.collection("Users").document(userEmail)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("DEBUG", "Failed to fetch friends list: ${error.message}", error)
+                    showToast("Failed to fetch friends. Check your network.")
+                    toggleNoFriendsMessage(dialogBinding, true)
+                    return@addSnapshotListener
+                }
+
+                if (snapshot != null && snapshot.exists()) {
+                    Log.d("DEBUG", "User document found: ${snapshot.data}")
+
+                    val friendsMap = snapshot.get("friendsMap") as? Map<*, *>
+                    val validFriendsMap: Map<String, String> = friendsMap
+                        ?.filterKeys { it is String }
+                        ?.mapNotNull { (key, value) ->
+                            if (key is String && value is String) key to value else null
+                        }
+                        ?.toMap()
+                        ?: emptyMap()
+
+                    Log.d("DEBUG", "Processed friends map: $validFriendsMap")
+                    updateFriendsUI(dialogBinding, validFriendsMap, selectedEmails)
+                } else {
                     Log.e("DEBUG", "User document does not exist in Firestore.")
                     showToast("Error: User profile not found")
                     toggleNoFriendsMessage(dialogBinding, true)
-                    return@addOnSuccessListener
                 }
-
-                Log.d("DEBUG", "User document data: ${document.data}")
-
-                val friendsMap = document.get("friendsMap") as? Map<String, String> ?: emptyMap()
-                Log.d("DEBUG", "Fetched friendsMap: $friendsMap")
-
-                toggleNoFriendsMessage(dialogBinding, friendsMap.isEmpty())
-
-                val friendsList = friendsMap.map { Friend(it.value, it.key) }
-                Log.d("DEBUG", "Converted friends list: $friendsList")
-
-                // ✅ Set up adapter for friend selection
-                val adapter = FriendSelectionAdapter(
-                    context = this,
-                    friendsList = friendsList,
-                    selectedEmails = selectedEmails, // ✅ Preselect saved emails
-                    onFriendChecked = { friend, isChecked ->
-                        if (isChecked) selectedEmails.add(friend.email)
-                        else selectedEmails.remove(friend.email)
-                        Log.d("DEBUG", "Friend checked: ${friend.email}, isChecked: $isChecked")
-                    },
-                    showCheckBox = true
-                )
-
-                dialogBinding.listViewMembers.adapter = adapter
-                adapter.notifyDataSetChanged()
-            }
-            .addOnFailureListener { exception ->
-                Log.e("DEBUG", "Failed to fetch friends list: ${exception.message}", exception)
-                showToast("Failed to fetch friends list")
-                toggleNoFriendsMessage(dialogBinding, true)
             }
 
         // ✅ Save list with selected emails
@@ -421,22 +415,43 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.btnCreate.text = if (isEditing) "Update" else "Create"
     }
 
+    private fun updateFriendsUI(
+        dialogBinding: DialogModifyListBinding,
+        friendsMap: Map<String, String>,
+        selectedEmails: MutableSet<String>
+    ) {
+        toggleNoFriendsMessage(dialogBinding, friendsMap.isEmpty())
 
+        val friendsList = friendsMap.map { Friend(it.value, it.key) }
+        Log.d("DEBUG", "Converted friends list: $friendsList")
 
+        val adapter = FriendSelectionAdapter(
+            context = this,
+            friendsList = friendsList,
+            selectedEmails = selectedEmails,
+            onFriendChecked = { friend, isChecked ->
+                if (isChecked) selectedEmails.add(friend.email)
+                else selectedEmails.remove(friend.email)
+                Log.d("DEBUG", "Friend checked: ${friend.email}, isChecked: $isChecked")
+            },
+            showCheckBox = true
+        )
+
+        dialogBinding.listViewMembers.adapter = adapter
+        adapter.notifyDataSetChanged()
+    }
 
     private fun toggleNoFriendsMessage(dialogBinding: DialogModifyListBinding, isEmpty: Boolean) {
         dialogBinding.textViewNoFriends.visibility = if (isEmpty) View.VISIBLE else View.GONE
         dialogBinding.listViewMembers.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
-
-
     private fun createNewList(listName: String, selectedEmails: List<String>) {
         val userEmail = auth.currentUser?.email ?: return
-        val newList = ShoppingList(
-            listName = listName,
-            owner = userEmail,
-            accessEmails = selectedEmails  // ✅ Store selected emails
+        val newList = mapOf(
+            "listName" to listName,
+            "owner" to userEmail,
+            "accessEmails" to selectedEmails
         )
 
         db.collection("shopping_lists").add(newList)
@@ -444,26 +459,23 @@ class ListManagementActivity : AppCompatActivity() {
             .addOnFailureListener { showToast("Failed to create list") }
     }
 
-
-
     private fun updateExistingList(listId: String, listName: String, selectedEmails: List<String>) {
         val updates = mapOf(
-            "name" to listName,
-            "accessEmails" to selectedEmails  // ✅ Update shared users
+            "listName" to listName, // ✅ Fix: Ensure correct field name
+            "accessEmails" to selectedEmails
         )
 
         db.collection("shopping_lists").document(listId)
             .update(updates)
             .addOnSuccessListener {
                 showToast("List updated successfully")
+                listAdapter.clearSelection()  // ✅ Deselect all items
+                toggleSelectionMode(false)   // ✅ Exit selection mode
             }
             .addOnFailureListener {
                 showToast("Failed to update list")
             }
     }
-
-
-
 
     @SuppressLint("SetTextI18n")
     private fun showDeleteConfirmation(listName: String) {
