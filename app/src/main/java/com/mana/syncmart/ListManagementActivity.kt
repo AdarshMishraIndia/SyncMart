@@ -166,7 +166,6 @@ class ListManagementActivity : AppCompatActivity() {
 
     private fun setupRecyclerView() {
         listAdapter = ListAdapter(
-            shoppingLists.values.toMutableList(),
             onSelectionChanged = { isSelectionActive, selectedCount ->
                 toggleSelectionMode(isSelectionActive, selectedCount)
             },
@@ -279,63 +278,77 @@ class ListManagementActivity : AppCompatActivity() {
     private fun fetchShoppingLists() {
         val userEmail = auth.currentUser?.email ?: return
 
-        // Remove old listeners to prevent duplication
+        // Clear old listeners
         realTimeListeners.forEach { it.remove() }
         realTimeListeners.clear()
 
         val combinedShoppingLists = mutableMapOf<String, ShoppingList>()
 
-        // Listen for lists where the user is the owner
-        val ownerListener = db.collection("shopping_lists")
-            .whereEqualTo("owner", userEmail)
-            .addSnapshotListener { ownerSnapshot, error ->
-                if (error != null) {
-                    showToast("Failed to fetch lists")
-                    return@addSnapshotListener
-                }
-
-                ownerSnapshot?.documents?.forEach { doc ->
-                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
-                    list?.let { combinedShoppingLists[doc.id] = it }
-                }
-
-                updateUI(combinedShoppingLists)
-            }
-
-        // Listen for lists where the user has access
-        val accessListener = db.collection("shopping_lists")
-            .whereArrayContains("accessEmails", userEmail)
-            .addSnapshotListener { accessSnapshot, error ->
-                if (error != null) {
-                    showToast("Failed to fetch lists")
-                    return@addSnapshotListener
-                }
-
-                accessSnapshot?.documents?.forEach { doc ->
-                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
-                    list?.let { combinedShoppingLists[doc.id] = it }
-                }
-
-                updateUI(combinedShoppingLists)
-            }
-
-        // Store listeners for cleanup
-        realTimeListeners.add(ownerListener)
-        realTimeListeners.add(accessListener)
-    }
-
-    private fun updateUI(updatedLists: Map<String, ShoppingList>) {
-        shoppingLists.clear()
-        shoppingLists.putAll(updatedLists)
-        listAdapter.updateList(shoppingLists.values.toMutableList())
-
-        // ✅ Ensure selection mode exits when all items are deselected
-        if (listAdapter.getSelectedItems().isEmpty()) {
+        // Helper to push updates to UI
+        fun updateUI() {
+            shoppingLists.clear()
+            shoppingLists.putAll(combinedShoppingLists)
+            listAdapter.updateListPreserveSelection(shoppingLists.values.toMutableList())
             toggleSelectionMode(false)
+
+            binding.emptyStateText.visibility =
+                if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
         }
 
-        binding.emptyStateText.visibility =
-            if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
+        val ownerListener = db.collection("shopping_lists")
+            .whereEqualTo("owner", userEmail)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("FirestoreError", "Owner listener error: ${error.message}", error)
+                    return@addSnapshotListener
+                }
+
+                snapshot?.documents?.forEach { doc ->
+                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
+                    if (list != null) {
+                        combinedShoppingLists[doc.id] = list
+                    } else {
+                        combinedShoppingLists.remove(doc.id)
+                    }
+                }
+
+                // Clean up deleted docs
+                val currentIds = snapshot?.documents?.map { it.id } ?: emptyList()
+                combinedShoppingLists.keys
+                    .filter { it !in currentIds && shoppingLists[it]?.owner == userEmail }
+                    .forEach { combinedShoppingLists.remove(it) }
+
+                updateUI()
+            }
+
+        val accessListener = db.collection("shopping_lists")
+            .whereArrayContains("accessEmails", userEmail)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("FirestoreError", "Access listener error: ${error.message}", error)
+                    return@addSnapshotListener
+                }
+
+                snapshot?.documents?.forEach { doc ->
+                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
+                    if (list != null) {
+                        combinedShoppingLists[doc.id] = list
+                    } else {
+                        combinedShoppingLists.remove(doc.id)
+                    }
+                }
+
+                // Clean up deleted docs
+                val currentIds = snapshot?.documents?.map { it.id } ?: emptyList()
+                combinedShoppingLists.keys
+                    .filter { it !in currentIds && shoppingLists[it]?.accessEmails?.contains(userEmail) == true }
+                    .forEach { combinedShoppingLists.remove(it) }
+
+                updateUI()
+            }
+
+        realTimeListeners.add(ownerListener)
+        realTimeListeners.add(accessListener)
     }
 
     private fun showModifyDialog(isEditing: Boolean, existingList: ShoppingList? = null) {
