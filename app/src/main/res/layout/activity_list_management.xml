@@ -56,7 +56,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:padding="5dp"
-                        android:text="Welcome, Adarsh"
+                        android:text="Welcome, (UserName)"
                         android:textColor="#FFFF00"
                         android:shadowRadius="10"
                         android:shadowColor="@color/black"

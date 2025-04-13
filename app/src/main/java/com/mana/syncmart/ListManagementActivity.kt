@@ -19,6 +19,8 @@ import com.mana.syncmart.databinding.DialogModifyListBinding
 import android.widget.Toast
 import androidx.core.view.GravityCompat
 import android.util.Log
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
 
 @Suppress("UNCHECKED_CAST", "DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
@@ -40,6 +42,7 @@ class ListManagementActivity : AppCompatActivity() {
         auth = FirebaseAuth.getInstance()
 
         setupRecyclerView()
+        setupDragAndDrop()
         fetchUserName()
         fetchShoppingLists()
 
@@ -89,33 +92,23 @@ class ListManagementActivity : AppCompatActivity() {
         val userEmail = auth.currentUser?.email
 
         if (userEmail.isNullOrEmpty()) {
-            Log.e("FirestoreError", "User email is null, cannot fetch profile")
             showToast("Error: User email is null")
             return
         }
 
-        // 🔹 Log email before fetching document
-        Log.d("FirestoreDebug", "Fetching user profile for email: $userEmail")
-
         db.collection("Users").document(userEmail).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
-                    Log.d("FirestoreDebug", "Document found: ${document.data}")
-                    userName = document.getString("name") ?: "User"
-                    Log.d("FirestoreDebug", "Fetched user name: $userName")
+                    userName = document.getString("name")?.split(" ")?.firstOrNull()?.trim() ?: "User"
                     updateToolbarTitle()
                 } else {
-                    Log.e("FirestoreError", "User document not found for $userEmail")
                     showToast("User profile not found")
                 }
             }
             .addOnFailureListener { e ->
-                Log.e("FirestoreError", "Failed to fetch user profile", e)
                 showToast("Failed to fetch user profile")
             }
     }
-
-
 
     @SuppressLint("SetTextI18n")
     private fun updateToolbarTitle() {
@@ -129,12 +122,10 @@ class ListManagementActivity : AppCompatActivity() {
             binding.toolbarUser.visibility = View.VISIBLE
 
             // 🔹 Force UI update with userName
-            binding.toolbar.title = "Welcome, $userName"
+            binding.toolbarUser.text = "Welcome, $userName"
             Log.d("UIUpdate", "Toolbar title updated to: Welcome, $userName")
         }
     }
-
-
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
@@ -274,7 +265,6 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ FETCH LISTS WHERE USER IS EITHER OWNER OR IN accessEmails
     private fun fetchShoppingLists() {
         val userEmail = auth.currentUser?.email ?: return
 
@@ -288,7 +278,9 @@ class ListManagementActivity : AppCompatActivity() {
         fun updateUI() {
             shoppingLists.clear()
             shoppingLists.putAll(combinedShoppingLists)
-            listAdapter.updateListPreserveSelection(shoppingLists.values.toMutableList())
+            // Sort the shopping lists by position
+            val sortedLists = combinedShoppingLists.values.sortedBy { it.position }
+            listAdapter.updateListPreserveSelection(sortedLists.toMutableList())
             toggleSelectionMode(false)
 
             binding.emptyStateText.visibility =
@@ -538,5 +530,27 @@ class ListManagementActivity : AppCompatActivity() {
             super.onBackPressed() // Default behavior (exit activity)
         }
     }
+
+    private fun setupDragAndDrop() {
+        val callback = object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0) {
+            override fun onMove(
+                recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                val fromPosition = viewHolder.adapterPosition
+                val toPosition = target.adapterPosition
+                listAdapter.moveItem(fromPosition, toPosition)
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                // No swipe functionality needed here, so we can leave this empty
+            }
+        }
+
+        val touchHelper = ItemTouchHelper(callback)
+        touchHelper.attachToRecyclerView(binding.recyclerView)
+    }
+
 
 }

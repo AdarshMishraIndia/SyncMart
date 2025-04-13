@@ -1,11 +1,14 @@
 package com.mana.syncmart
 
 import android.annotation.SuppressLint
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.firestore.FirebaseFirestore
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
 
 class ListAdapter(
@@ -85,17 +88,53 @@ class ListAdapter(
         onSelectionChanged(false, 0)
         notifyDataSetChanged()
     }
+
     fun updateListPreserveSelection(newLists: List<ShoppingList>) {
+        // Preserve previously selected items
         val previousSelection = selectedItems.toSet()
 
-        submitList(newLists)
+        // Sort the new list based on position
+        val sortedLists = newLists.sortedBy { it.position } // or sortedByDescending if you want descending order
 
+        // Submit the sorted list to the adapter
+        submitList(sortedLists)
+
+        // Preserve selection state (keeping the selected items if they are still in the list)
         selectedItems.clear()
         selectedItems.addAll(
-            newLists.filter { previousSelection.contains(it.id) }.map { it.id }
+            sortedLists.filter { previousSelection.contains(it.id) }.map { it.id }
         )
 
+        // Update selection mode state
         isSelectionMode = selectedItems.isNotEmpty()
         onSelectionChanged(isSelectionMode, selectedItems.size)
     }
+
+    fun moveItem(fromPosition: Int, toPosition: Int) {
+        val item = getItem(fromPosition)
+        val updatedList = currentList.toMutableList()
+        updatedList.removeAt(fromPosition)
+        updatedList.add(toPosition, item)
+
+        // Submit the updated list to RecyclerView first
+        submitList(updatedList)  // This will visually update the item in the RecyclerView
+
+        // Delay Firestore update to make sure the item is fully moved
+        Handler(Looper.getMainLooper()).postDelayed({
+            updatedList.forEachIndexed { index, shoppingList ->
+                shoppingList.position = index  // Update the position field
+
+                // Update position in Firestore database
+                FirebaseFirestore.getInstance().collection("shopping_lists")
+                    .document(shoppingList.id)
+                    .update("position", index)
+                    .addOnFailureListener {
+                        // Handle failure to update the position in Firestore
+                    }
+            }
+        }, 1500)  // Delay by 300ms to ensure the RecyclerView animation is complete
+    }
+
+
+
 }

@@ -71,8 +71,14 @@ class ListActivity : AppCompatActivity() {
         // Get the current date in "yyyy-MM-dd" format
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
+
+        // Check if the last cleared date is different from the current date
         if (lastClearedDate != currentDate) {
+
+            // Clear the finished items and update the last cleared date
             clearFinishedItemsForAllLists()
+
+            // Update the SharedPreferences to store the current date
             sharedPreferences.edit { putString("lastClearedDate", currentDate) }
         }
     }
@@ -81,14 +87,18 @@ class ListActivity : AppCompatActivity() {
         db.collection("shopping_lists").get()
             .addOnSuccessListener { documents ->
                 for (document in documents) {
+                    // Clear finished items and retain pending items
                     document.reference.update(mapOf(
                         "finishedItems" to arrayListOf<String>(), // ✅ Ensures the field exists
                         "pendingItems" to FieldValue.arrayUnion() // 🔥 Keeps `pendingItems` intact
                     ))
                 }
             }
+            .addOnFailureListener { e ->
+                // Show a toast in case of failure
+                showCustomToast("Error clearing finished items: ${e.message}")
+            }
     }
-
 
     private fun setupViewPager() {
         val adapter = ViewPagerAdapter(this)
@@ -143,7 +153,6 @@ class ListActivity : AppCompatActivity() {
             db.collection("shopping_lists").document(id)
                 .update("pendingItems", FieldValue.arrayUnion(*items.toTypedArray()))
                 .addOnSuccessListener {
-                    showCustomToast("✅ Items added successfully!")
                 }
                 .addOnFailureListener {
                     showCustomToast("❌ Unable to add items. Please try again.")
