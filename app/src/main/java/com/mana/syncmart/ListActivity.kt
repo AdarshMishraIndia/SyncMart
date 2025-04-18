@@ -87,11 +87,10 @@ class ListActivity : AppCompatActivity() {
         db.collection("shopping_lists").get()
             .addOnSuccessListener { documents ->
                 for (document in documents) {
-                    // Clear finished items and retain pending items
-                    document.reference.update(mapOf(
-                        "finishedItems" to arrayListOf<String>(), // ✅ Ensures the field exists
-                        "pendingItems" to FieldValue.arrayUnion() // 🔥 Keeps `pendingItems` intact
-                    ))
+                    // Clear finished items
+                    document.reference.update(
+                        mapOf("finishedItems" to arrayListOf<String>())
+                    )
                 }
             }
             .addOnFailureListener { e ->

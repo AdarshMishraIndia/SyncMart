@@ -268,24 +268,27 @@ class ListManagementActivity : AppCompatActivity() {
     private fun fetchShoppingLists() {
         val userEmail = auth.currentUser?.email ?: return
 
-        // Clear old listeners
-        realTimeListeners.forEach { it.remove() }
-        realTimeListeners.clear()
-
+        // Avoid resetting on every event
         val combinedShoppingLists = mutableMapOf<String, ShoppingList>()
 
-        // Helper to push updates to UI
-        fun updateUI() {
-            shoppingLists.clear()
-            shoppingLists.putAll(combinedShoppingLists)
-            // Sort the shopping lists by position
-            val sortedLists = combinedShoppingLists.values.sortedBy { it.position }
-            listAdapter.updateListPreserveSelection(sortedLists.toMutableList())
-            toggleSelectionMode(false)
+        fun updateUIIfNeeded() {
+            // Sort and compare old/new to avoid unnecessary redraws
+            val newSorted = combinedShoppingLists.values.sortedBy { it.position }
+            val oldSorted = listAdapter.currentList
 
-            binding.emptyStateText.visibility =
-                if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
+            if (newSorted != oldSorted) {
+                shoppingLists.clear()
+                newSorted.forEach { shoppingLists[it.id] = it }
+                listAdapter.updateListPreserveSelection(newSorted.toMutableList())
+                toggleSelectionMode(false)
+
+                binding.emptyStateText.visibility =
+                    if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
+            }
         }
+
+        realTimeListeners.forEach { it.remove() }
+        realTimeListeners.clear()
 
         val ownerListener = db.collection("shopping_lists")
             .whereEqualTo("owner", userEmail)
@@ -296,21 +299,12 @@ class ListManagementActivity : AppCompatActivity() {
                 }
 
                 snapshot?.documents?.forEach { doc ->
-                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
-                    if (list != null) {
-                        combinedShoppingLists[doc.id] = list
-                    } else {
-                        combinedShoppingLists.remove(doc.id)
+                    doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
+                        combinedShoppingLists[doc.id] = it
                     }
                 }
 
-                // Clean up deleted docs
-                val currentIds = snapshot?.documents?.map { it.id } ?: emptyList()
-                combinedShoppingLists.keys
-                    .filter { it !in currentIds && shoppingLists[it]?.owner == userEmail }
-                    .forEach { combinedShoppingLists.remove(it) }
-
-                updateUI()
+                updateUIIfNeeded()
             }
 
         val accessListener = db.collection("shopping_lists")
@@ -322,21 +316,12 @@ class ListManagementActivity : AppCompatActivity() {
                 }
 
                 snapshot?.documents?.forEach { doc ->
-                    val list = doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)
-                    if (list != null) {
-                        combinedShoppingLists[doc.id] = list
-                    } else {
-                        combinedShoppingLists.remove(doc.id)
+                    doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
+                        combinedShoppingLists[doc.id] = it
                     }
                 }
 
-                // Clean up deleted docs
-                val currentIds = snapshot?.documents?.map { it.id } ?: emptyList()
-                combinedShoppingLists.keys
-                    .filter { it !in currentIds && shoppingLists[it]?.accessEmails?.contains(userEmail) == true }
-                    .forEach { combinedShoppingLists.remove(it) }
-
-                updateUI()
+                updateUIIfNeeded()
             }
 
         realTimeListeners.add(ownerListener)
