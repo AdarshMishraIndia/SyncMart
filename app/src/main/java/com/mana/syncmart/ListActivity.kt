@@ -76,27 +76,21 @@ class ListActivity : AppCompatActivity() {
         if (lastClearedDate != currentDate) {
 
             // Clear the finished items and update the last cleared date
-            clearFinishedItemsForAllLists()
+            clearFinishedItems()
 
             // Update the SharedPreferences to store the current date
             sharedPreferences.edit { putString("lastClearedDate", currentDate) }
         }
     }
 
-    private fun clearFinishedItemsForAllLists() {
-        db.collection("shopping_lists").get()
-            .addOnSuccessListener { documents ->
-                for (document in documents) {
-                    // Clear finished items
-                    document.reference.update(
-                        mapOf("finishedItems" to arrayListOf<String>())
-                    )
+    private fun clearFinishedItems() {
+        listId?.let { id ->
+            db.collection("shopping_lists").document(id)
+                .update("finishedItems", arrayListOf<String>())
+                .addOnFailureListener { e ->
+                    showCustomToast("Error clearing finished items: ${e.message}")
                 }
-            }
-            .addOnFailureListener { e ->
-                // Show a toast in case of failure
-                showCustomToast("Error clearing finished items: ${e.message}")
-            }
+        }
     }
 
     private fun setupViewPager() {

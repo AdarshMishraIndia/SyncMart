@@ -279,7 +279,13 @@ class ListManagementActivity : AppCompatActivity() {
             if (newSorted != oldSorted) {
                 shoppingLists.clear()
                 newSorted.forEach { shoppingLists[it.id] = it }
-                listAdapter.updateListPreserveSelection(newSorted.toMutableList())
+                listAdapter.updateListPreserveSelection(newSorted.toMutableList()) // Update the adapter's list
+
+                // Call updateItemInCache here to update the cache for each item
+                newSorted.forEach { shoppingListItem ->
+                    listAdapter.updateItemInCache(shoppingListItem) // Update each item individually
+                }
+
                 toggleSelectionMode(false)
 
                 binding.emptyStateText.visibility =
@@ -290,6 +296,7 @@ class ListManagementActivity : AppCompatActivity() {
         realTimeListeners.forEach { it.remove() }
         realTimeListeners.clear()
 
+        // Real-time listener for shopping lists owned by the user
         val ownerListener = db.collection("shopping_lists")
             .whereEqualTo("owner", userEmail)
             .addSnapshotListener { snapshot, error ->
@@ -307,6 +314,7 @@ class ListManagementActivity : AppCompatActivity() {
                 updateUIIfNeeded()
             }
 
+        // Real-time listener for shopping lists the user has access to
         val accessListener = db.collection("shopping_lists")
             .whereArrayContains("accessEmails", userEmail)
             .addSnapshotListener { snapshot, error ->
@@ -327,6 +335,7 @@ class ListManagementActivity : AppCompatActivity() {
         realTimeListeners.add(ownerListener)
         realTimeListeners.add(accessListener)
     }
+
 
     private fun showModifyDialog(isEditing: Boolean, existingList: ShoppingList? = null) {
         val dialogBinding = DialogModifyListBinding.inflate(layoutInflater)

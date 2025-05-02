@@ -135,6 +135,11 @@ class ListAdapter(
         }, 1500)  // Delay by 300ms to ensure the RecyclerView animation is complete
     }
 
-
-
+    fun updateItemInCache(updatedList: ShoppingList) {
+        val index = currentList.indexOfFirst { it.id == updatedList.id }
+        if (index != -1) {
+            currentList.toMutableList()[index] = updatedList
+            submitList(currentList) // Notify the adapter of the change
+        }
+    }
 }
