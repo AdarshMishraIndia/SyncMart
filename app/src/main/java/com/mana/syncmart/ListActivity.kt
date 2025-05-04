@@ -66,32 +66,39 @@ class ListActivity : AppCompatActivity() {
 
     private fun checkAndClearFinishedItems() {
         val sharedPreferences = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-        val lastClearedDate = sharedPreferences.getString("lastClearedDate", "")
-
-        // Get the current date in "yyyy-MM-dd" format
+        val lastClearedDate = sharedPreferences.getString("lastClearedDate", null)
         val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
+        showCustomToast("📆 Last cleared: ${lastClearedDate ?: "N/A"} | Today: $currentDate")
 
-        // Check if the last cleared date is different from the current date
-        if (lastClearedDate != currentDate) {
-
-            // Clear the finished items and update the last cleared date
+        if (!lastClearedDate.isNullOrEmpty() && lastClearedDate != currentDate) {
+            showCustomToast("🕒 New day detected. Clearing finished items.")
             clearFinishedItems()
-
-            // Update the SharedPreferences to store the current date
             sharedPreferences.edit { putString("lastClearedDate", currentDate) }
+        } else if (lastClearedDate.isNullOrEmpty()) {
+            showCustomToast("🆕 First-time setup. Saving today's date.")
+            sharedPreferences.edit { putString("lastClearedDate", currentDate) }
+        } else {
+            showCustomToast("✅ Already cleared today. No action needed.")
         }
     }
 
+
     private fun clearFinishedItems() {
+        showCustomToast("🧹 Attempting to clear finished items...")
+
         listId?.let { id ->
             db.collection("shopping_lists").document(id)
                 .update("finishedItems", arrayListOf<String>())
-                .addOnFailureListener { e ->
-                    showCustomToast("Error clearing finished items: ${e.message}")
+                .addOnSuccessListener {
+                    showCustomToast("✅ Finished items cleared successfully.")
                 }
-        }
+                .addOnFailureListener { e ->
+                    showCustomToast("❌ Error clearing finished items: ${e.message}")
+                }
+        } ?: showCustomToast("⚠️ listId is null, cannot clear finished items.")
     }
+
 
     private fun setupViewPager() {
         val adapter = ViewPagerAdapter(this)
