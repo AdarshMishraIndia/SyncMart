@@ -1,6 +1,5 @@
 package com.mana.syncmart
 
-import android.annotation.SuppressLint
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
@@ -12,14 +11,52 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
 
 class ListAdapter(
-    private val onSelectionChanged: (Boolean, Int) -> Unit, // Now includes count for menu
+    private val onSelectionChanged: (Boolean, Int) -> Unit,
     private val onListClicked: (ShoppingList) -> Unit
 ) : ListAdapter<ShoppingList, ListAdapter.ViewHolder>(ShoppingListItemCallback()) {
 
     private val selectedItems = mutableSetOf<String>()
     private var isSelectionMode = false
 
-    class ViewHolder(val binding: ListRecyclerLayoutBinding) : RecyclerView.ViewHolder(binding.root)
+    inner class ViewHolder(private val binding: ListRecyclerLayoutBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+
+        fun bind(item: ShoppingList) {
+            // Explicitly set the name to avoid glitches during recycling
+            binding.buttonName.text = item.listName.ifEmpty { "Unnamed List" }
+            updateNotifBubble(item)
+            updateItemBackground(item)
+
+            binding.root.setOnClickListener {
+                if (isSelectionMode) toggleSelection(item.id) else onListClicked(item)
+            }
+
+            binding.root.setOnLongClickListener {
+                if (!isSelectionMode) {
+                    isSelectionMode = true
+                    toggleSelection(item.id)
+                }
+                true
+            }
+        }
+
+        private fun updateNotifBubble(item: ShoppingList) {
+            binding.notifBubble.apply {
+                visibility = if (item.pendingItems.isNotEmpty()) View.VISIBLE else View.GONE
+                text = item.pendingItems.size.toString()
+            }
+        }
+
+        private fun updateItemBackground(item: ShoppingList) {
+            val userEmail = AuthUtils.getCurrentUser()?.email
+            val background = when {
+                selectedItems.contains(item.id) -> R.drawable.selected_bg
+                item.owner == userEmail -> R.drawable.list_bg_owner
+                else -> R.drawable.list_bg
+            }
+            binding.root.setBackgroundResource(background)
+        }
+    }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val binding = ListRecyclerLayoutBinding.inflate(LayoutInflater.from(parent.context), parent, false)
@@ -27,114 +64,87 @@ class ListAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val listItem = getItem(position)
-        holder.binding.buttonName.text = listItem.listName.ifEmpty { "Unnamed List" }
-
-        // Notification bubble visibility
-        holder.binding.notifBubble.apply {
-            visibility = if (listItem.pendingItems.isNotEmpty()) View.VISIBLE else View.GONE
-            text = listItem.pendingItems.size.toString()
-        }
-
-        val loggedInUserEmail = AuthUtils.getCurrentUser()?.email
-
-        // Visual background state
-        when {
-            selectedItems.contains(listItem.id) -> holder.itemView.setBackgroundResource(R.drawable.selected_bg)
-            listItem.owner == loggedInUserEmail -> holder.itemView.setBackgroundResource(R.drawable.list_bg_owner)
-            else -> holder.itemView.setBackgroundResource(R.drawable.list_bg)
-        }
-
-        // Handle click events
-        holder.itemView.setOnClickListener {
-            if (isSelectionMode) {
-                toggleSelection(listItem.id)
-            } else {
-                onListClicked(listItem)
-            }
-        }
-
-        // Handle long-press to enable selection
-        holder.itemView.setOnLongClickListener {
-            if (!isSelectionMode) {
-                isSelectionMode = true
-                toggleSelection(listItem.id)
-            }
-            true
-        }
+        holder.bind(getItem(position))
     }
 
-    @SuppressLint("NotifyDataSetChanged")
     private fun toggleSelection(listId: String) {
-        if (selectedItems.contains(listId)) {
-            selectedItems.remove(listId)
-        } else {
-            selectedItems.add(listId)
-        }
+        val wasSelected = selectedItems.remove(listId)
+        if (!wasSelected) selectedItems.add(listId)
 
         isSelectionMode = selectedItems.isNotEmpty()
         onSelectionChanged(isSelectionMode, selectedItems.size)
-        notifyDataSetChanged() // Needed to update backgrounds instantly
+
+        // More efficient than notifyDataSetChanged(), only notify the affected item
+        notifyItemChanged(currentList.indexOfFirst { it.id == listId })
     }
 
     fun getSelectedItems(): List<String> = selectedItems.toList()
 
     fun isSelectionModeActive(): Boolean = isSelectionMode
 
-    @SuppressLint("NotifyDataSetChanged")
     fun clearSelection() {
+        val previousSelection = selectedItems.toSet()
         selectedItems.clear()
         isSelectionMode = false
         onSelectionChanged(false, 0)
-        notifyDataSetChanged()
+
+        // Refresh only previously selected items
+        previousSelection.forEach { id ->
+            val index = currentList.indexOfFirst { it.id == id }
+            if (index >= 0) notifyItemChanged(index)
+        }
     }
 
     fun updateListPreserveSelection(newLists: List<ShoppingList>) {
-        // Preserve previously selected items
+        val sortedLists = newLists.sortedBy { it.position }
         val previousSelection = selectedItems.toSet()
 
-        // Sort the new list based on position
-        val sortedLists = newLists.sortedBy { it.position } // or sortedByDescending if you want descending order
-
-        // Submit the sorted list to the adapter
-        submitList(sortedLists)
-
-        // Preserve selection state (keeping the selected items if they are still in the list)
-        selectedItems.clear()
-        selectedItems.addAll(
-            sortedLists.filter { previousSelection.contains(it.id) }.map { it.id }
-        )
-
-        // Update selection mode state
-        isSelectionMode = selectedItems.isNotEmpty()
-        onSelectionChanged(isSelectionMode, selectedItems.size)
+        submitList(sortedLists) {
+            selectedItems.clear()
+            selectedItems.addAll(sortedLists.filter { previousSelection.contains(it.id) }.map { it.id })
+            isSelectionMode = selectedItems.isNotEmpty()
+            onSelectionChanged(isSelectionMode, selectedItems.size)
+        }
     }
 
     fun moveItem(fromPosition: Int, toPosition: Int) {
-        val item = getItem(fromPosition)
+        if (fromPosition == toPosition) return
+
         val updatedList = currentList.toMutableList()
-        updatedList.removeAt(fromPosition)
+        val item = updatedList.removeAt(fromPosition)
         updatedList.add(toPosition, item)
 
-        // Submit the updated list to RecyclerView first
-        submitList(updatedList)  // This will visually update the item in the RecyclerView
-
-        // Delay Firestore update to make sure the item is fully moved
-        Handler(Looper.getMainLooper()).postDelayed({
-            updatedList.forEachIndexed { index, shoppingList ->
-                shoppingList.position = index  // Update the position field
-
-                // Update position in Firestore database
-                FirebaseFirestore.getInstance().collection("shopping_lists")
-                    .document(shoppingList.id)
-                    .update("position", index)
-                    .addOnFailureListener {
-                        // Handle failure to update the position in Firestore
-                    }
-            }
-        }, 1500)  // Delay by 300ms to ensure the RecyclerView animation is complete
+        submitList(updatedList) {
+            persistItemPositions(updatedList)
+        }
     }
 
+    fun removeItemById(itemId: String) {
+        val updatedList = currentList.toMutableList()
+        val index = updatedList.indexOfFirst { it.id == itemId }
+        if (index != -1) {
+            updatedList.removeAt(index)
+            submitList(updatedList) {
+                // DiffUtil will handle animations for us here
+            }
 
+            // Also update selection state
+            selectedItems.remove(itemId)
+            isSelectionMode = selectedItems.isNotEmpty()
+            onSelectionChanged(isSelectionMode, selectedItems.size)
+        }
+    }
 
+    private fun persistItemPositions(lists: List<ShoppingList>) {
+        Handler(Looper.getMainLooper()).postDelayed({
+            lists.forEachIndexed { index, item ->
+                item.position = index
+                FirebaseFirestore.getInstance()
+                    .collection("shopping_lists")
+                    .document(item.id)
+                    .update("position", index)
+            }
+        }, 300) // Delay to allow RecyclerView animations to finish
+    }
 }
+

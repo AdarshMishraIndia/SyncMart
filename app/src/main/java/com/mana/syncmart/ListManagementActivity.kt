@@ -8,19 +8,18 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.ActivityListManagementBinding
 import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.DialogModifyListBinding
-import android.widget.Toast
-import androidx.core.view.GravityCompat
-import android.util.Log
-import androidx.recyclerview.widget.ItemTouchHelper
-import androidx.recyclerview.widget.RecyclerView
 
 @Suppress("UNCHECKED_CAST", "DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
@@ -29,9 +28,9 @@ class ListManagementActivity : AppCompatActivity() {
     private lateinit var db: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private lateinit var listAdapter: ListAdapter
-    private var shoppingLists = mutableMapOf<String, ShoppingList>()
-    private var realTimeListeners = mutableListOf<ListenerRegistration>()
-    private var userName: String = "User" // Default until fetched
+    private val shoppingLists = mutableMapOf<String, ShoppingList>()
+    private val realTimeListeners = mutableListOf<ListenerRegistration>()
+    private var userName: String = "User"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,23 +40,27 @@ class ListManagementActivity : AppCompatActivity() {
         db = FirebaseFirestore.getInstance()
         auth = FirebaseAuth.getInstance()
 
-        setupRecyclerView()
-        setupDragAndDrop()
-        fetchUserName()
-        fetchShoppingLists()
-
         setSupportActionBar(binding.toolbar)
-
-        val drawerLayout = binding.drawerLayout
-        val navView = binding.navigationView
-
         supportActionBar?.apply {
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_menu)
             title = "SyncMart"
         }
 
-        // Navigation Drawer setup
+        setupRecyclerView()
+        setupDragAndDrop()
+        setupNavigationDrawer()
+        fetchUserName()
+        fetchShoppingLists()
+
+        binding.floatingActionButton.setOnClickListener {
+            showModifyDialog(isEditing = false)
+        }
+    }
+
+    private fun setupNavigationDrawer() {
+        val drawerLayout = binding.drawerLayout
+        val navView = binding.navigationView
         val navMenu = navView.menu
         val toggleItem = navMenu.findItem(R.id.nav_friends_and_lists)
         toggleItem.title = getString(R.string.friends)
@@ -82,32 +85,19 @@ class ListManagementActivity : AppCompatActivity() {
                 else -> false
             }
         }
-
-        binding.floatingActionButton.setOnClickListener {
-            showModifyDialog(isEditing = false)  // ✅ Correct parameter order
-        }
     }
 
     private fun fetchUserName() {
-        val userEmail = auth.currentUser?.email
-
-        if (userEmail.isNullOrEmpty()) {
-            showToast("Error: User email is null")
-            return
-        }
+        val userEmail = auth.currentUser?.email ?: return showToast("Error: User email is null")
 
         db.collection("Users").document(userEmail).get()
             .addOnSuccessListener { document ->
                 if (document.exists()) {
                     userName = document.getString("name")?.split(" ")?.firstOrNull()?.trim() ?: "User"
                     updateToolbarTitle()
-                } else {
-                    showToast("User profile not found")
-                }
+                } else showToast("User profile not found")
             }
-            .addOnFailureListener { e ->
-                showToast("Failed to fetch user profile")
-            }
+            .addOnFailureListener { showToast("Failed to fetch user profile") }
     }
 
     @SuppressLint("SetTextI18n")
@@ -120,12 +110,11 @@ class ListManagementActivity : AppCompatActivity() {
         } else {
             binding.toolbarTitle.visibility = View.VISIBLE
             binding.toolbarUser.visibility = View.VISIBLE
-
-            // 🔹 Force UI update with userName
             binding.toolbarUser.text = "Welcome, $userName"
-            Log.d("UIUpdate", "Toolbar title updated to: Welcome, $userName")
         }
     }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = true
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
@@ -145,40 +134,28 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-
     private fun logoutUser() {
         auth.signOut()
-        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show()
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
+        showToast("Logged out successfully")
+        startActivity(Intent(this, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
         finish()
     }
 
     private fun setupRecyclerView() {
         listAdapter = ListAdapter(
-            onSelectionChanged = { isSelectionActive, selectedCount ->
-                toggleSelectionMode(isSelectionActive, selectedCount)
-            },
-            onListClicked = { shoppingList ->
+            onSelectionChanged = { isActive, count -> toggleSelectionMode(isActive, count) },
+            onListClicked = { list ->
                 if (!listAdapter.isSelectionModeActive()) {
-                    val intent = Intent(this, ListActivity::class.java)
-                    intent.putExtra("LIST_ID", shoppingList.id)
-                    startActivity(intent)
+                    startActivity(Intent(this, ListActivity::class.java).putExtra("LIST_ID", list.id))
                 }
             }
         )
-
         binding.recyclerView.apply {
             layoutManager = LinearLayoutManager(this@ListManagementActivity)
             adapter = listAdapter
         }
-    }
-
-    // Add this to your activity
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        // Prevent automatic menu inflation by returning true without inflating
-        return true
     }
 
     @SuppressLint("SetTextI18n")
@@ -187,29 +164,20 @@ class ListManagementActivity : AppCompatActivity() {
             binding.toolbarTitle.visibility = View.GONE
             binding.toolbarUser.visibility = View.GONE
             binding.toolbar.title = "$selectedCount Selected"
-
             binding.toolbar.menu.clear()
             binding.toolbar.inflateMenu(R.menu.selection_menu)
 
-            val loggedInUserEmail = auth.currentUser?.email ?: return
+            val userEmail = auth.currentUser?.email ?: return
+            val allOwned = listAdapter.getSelectedItems().all { shoppingLists[it]?.owner == userEmail }
 
-            // Check if the logged-in user owns all selected lists
-            val allOwnedByUser = listAdapter.getSelectedItems().all { id ->
-                shoppingLists[id]?.owner == loggedInUserEmail
-            }
+            binding.toolbar.menu.findItem(R.id.action_delete_selection)?.isVisible = allOwned
+            binding.toolbar.menu.findItem(R.id.action_edit_selection)?.isVisible = allOwned && selectedCount == 1
 
-            val deleteItem = binding.toolbar.menu.findItem(R.id.action_delete_selection)
-            val editItem = binding.toolbar.menu.findItem(R.id.action_edit_selection)
-
-            deleteItem?.isVisible = allOwnedByUser
-            editItem?.isVisible = allOwnedByUser && selectedCount == 1
-
-            binding.toolbar.invalidate() // ✅ Force menu refresh
+            binding.toolbar.invalidate()
         } else {
             binding.toolbarTitle.visibility = View.VISIBLE
             binding.toolbarUser.visibility = View.VISIBLE
             binding.toolbar.title = "SyncMart"
-
             binding.toolbar.menu.clear()
         }
     }
@@ -224,66 +192,58 @@ class ListManagementActivity : AppCompatActivity() {
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
         dialogBinding.listName.text = "Delete ${selectedIds.size} selected lists?"
-
         dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
         dialogBinding.btnDelete.setOnClickListener {
-            deleteSelectedItems()
+            deleteSelectedItems(selectedIds)
             dialog.dismiss()
         }
 
         dialog.show()
     }
 
-    private fun deleteSelectedItems() {
-        val selectedIds = listAdapter.getSelectedItems()
-        if (selectedIds.isNotEmpty()) {
-            selectedIds.forEach { docId ->
-                db.collection("shopping_lists").document(docId).delete()
-                    .addOnSuccessListener {
-                        showToast("List deleted")
-                        fetchShoppingLists()
+    private fun deleteSelectedItems(selectedIds: List<String>) {
+        selectedIds.forEachIndexed { index, docId ->
+            db.collection("shopping_lists").document(docId).delete()
+                .addOnSuccessListener {
+                    // Remove from your local cache/map if applicable
+                    shoppingLists.remove(docId)
 
-                        // ✅ Clear selection after last item is deleted
-                        if (selectedIds.last() == docId) {
-                            listAdapter.clearSelection()
-                            toggleSelectionMode(false)
-                        }
+                    // Correct usage: pass the actual docId
+                    listAdapter.removeItemById(docId)
+
+                    // When all deletions are done
+                    if (index == selectedIds.lastIndex) {
+                        listAdapter.clearSelection()
+                        toggleSelectionMode(false)
+                        binding.emptyStateText.visibility =
+                            if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
                     }
-                    .addOnFailureListener {
-                        showToast("Failed to delete list")
-                    }
-            }
+                }
+                .addOnFailureListener {
+                    showToast("Failed to delete list: $docId")
+                }
         }
     }
 
-    private fun editSelectedItem() {
-        val selectedIds = listAdapter.getSelectedItems()
-        if (selectedIds.size == 1) {
-            val shoppingList = shoppingLists[selectedIds.first()]
-            shoppingList?.let { showModifyDialog(isEditing = true, existingList = it) }
 
-        }
+
+    private fun editSelectedItem() {
+        val selectedId = listAdapter.getSelectedItems().singleOrNull() ?: return
+        shoppingLists[selectedId]?.let { showModifyDialog(isEditing = true, existingList = it) }
     }
 
     private fun fetchShoppingLists() {
         val userEmail = auth.currentUser?.email ?: return
+        val combinedLists = mutableMapOf<String, ShoppingList>()
 
-        // Avoid resetting on every event
-        val combinedShoppingLists = mutableMapOf<String, ShoppingList>()
-
-        fun updateUIIfNeeded() {
-            // Sort and compare old/new to avoid unnecessary redraws
-            val newSorted = combinedShoppingLists.values.sortedBy { it.position }
-            val oldSorted = listAdapter.currentList
-
-            if (newSorted != oldSorted) {
+        fun updateUI() {
+            val newSorted = combinedLists.values.sortedBy { it.position }
+            if (newSorted != listAdapter.currentList) {
                 shoppingLists.clear()
                 newSorted.forEach { shoppingLists[it.id] = it }
                 listAdapter.updateListPreserveSelection(newSorted.toMutableList())
                 toggleSelectionMode(false)
-
-                binding.emptyStateText.visibility =
-                    if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
+                binding.emptyStateText.visibility = if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
             }
         }
 
@@ -293,139 +253,72 @@ class ListManagementActivity : AppCompatActivity() {
         val ownerListener = db.collection("shopping_lists")
             .whereEqualTo("owner", userEmail)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("FirestoreError", "Owner listener error: ${error.message}", error)
-                    return@addSnapshotListener
-                }
-
+                if (error != null) return@addSnapshotListener
                 snapshot?.documents?.forEach { doc ->
                     doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                        combinedShoppingLists[doc.id] = it
+                        combinedLists[doc.id] = it
                     }
                 }
-
-                updateUIIfNeeded()
+                updateUI()
             }
 
         val accessListener = db.collection("shopping_lists")
             .whereArrayContains("accessEmails", userEmail)
             .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("FirestoreError", "Access listener error: ${error.message}", error)
-                    return@addSnapshotListener
-                }
-
+                if (error != null) return@addSnapshotListener
                 snapshot?.documents?.forEach { doc ->
                     doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                        combinedShoppingLists[doc.id] = it
+                        combinedLists[doc.id] = it
                     }
                 }
-
-                updateUIIfNeeded()
+                updateUI()
             }
 
-        realTimeListeners.add(ownerListener)
-        realTimeListeners.add(accessListener)
+        realTimeListeners.addAll(listOf(ownerListener, accessListener))
     }
 
     private fun showModifyDialog(isEditing: Boolean, existingList: ShoppingList? = null) {
         val dialogBinding = DialogModifyListBinding.inflate(layoutInflater)
-        val dialog = AlertDialog.Builder(this)
-            .setView(dialogBinding.root)
-            .create()
-
+        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
 
-        // ✅ Restore selected emails when editing
         val selectedEmails = existingList?.accessEmails?.toMutableSet() ?: mutableSetOf()
+        dialogBinding.editTextListName.setText(existingList?.listName ?: "")
 
-        // ✅ Pre-fill list name if editing
-        if (isEditing) {
-            dialogBinding.editTextListName.setText(existingList?.listName ?: "")
-        }
+        val userEmail = auth.currentUser?.email ?: return showToast("Error: User email is null")
 
-        val userEmail = auth.currentUser?.email
-        if (userEmail == null) {
-            Log.e("DEBUG", "User email is null, cannot fetch friends.")
-            showToast("Error: User email is null")
-            return
-        }
-
-        Log.d("DEBUG", "Fetching friends for userEmail: $userEmail")
-
-        // ✅ Fetch friends list from Firestore using real-time listener
-        db.collection("Users").document(userEmail)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("DEBUG", "Failed to fetch friends list: ${error.message}", error)
-                    showToast("Failed to fetch friends. Check your network.")
-                    toggleNoFriendsMessage(dialogBinding, true)
-                    return@addSnapshotListener
-                }
-
-                if (snapshot != null && snapshot.exists()) {
-                    Log.d("DEBUG", "User document found: ${snapshot.data}")
-
-                    val friendsMap = snapshot.get("friendsMap") as? Map<*, *>
-                    val validFriendsMap: Map<String, String> = friendsMap
-                        ?.filterKeys { it is String }
-                        ?.mapNotNull { (key, value) ->
-                            if (key is String && value is String) key to value else null
-                        }
-                        ?.toMap()
-                        ?: emptyMap()
-
-                    Log.d("DEBUG", "Processed friends map: $validFriendsMap")
-                    updateFriendsUI(dialogBinding, validFriendsMap, selectedEmails)
-                } else {
-                    Log.e("DEBUG", "User document does not exist in Firestore.")
-                    showToast("Error: User profile not found")
-                    toggleNoFriendsMessage(dialogBinding, true)
-                }
+        db.collection("Users").document(userEmail).addSnapshotListener { snapshot, error ->
+            if (error != null || snapshot == null || !snapshot.exists()) {
+                toggleNoFriendsMessage(dialogBinding, true)
+                return@addSnapshotListener
             }
 
-        // ✅ Save list with selected emails
-        dialogBinding.btnCreate.setOnClickListener {
-            val listName = dialogBinding.editTextListName.text.toString().trim()
-            if (listName.isEmpty()) {
-                showToast("List name cannot be empty")
-                return@setOnClickListener
-            }
+            val rawMap = snapshot.get("friendsMap") as? Map<*, *> ?: emptyMap<String, String>()
+            val validMap = rawMap.entries.mapNotNull {
+                (it.key as? String)?.let { k -> (it.value as? String)?.let { v -> k to v } }
+            }.toMap()
 
-            if (isEditing) {
-                existingList?.id?.let { updateExistingList(it, listName, selectedEmails.toList()) }
-            } else {
-                createNewList(listName, selectedEmails.toList())
-            }
-
-            dialog.dismiss()
+            updateFriendsUI(dialogBinding, validMap, selectedEmails)
         }
 
         dialogBinding.btnCreate.text = if (isEditing) "Update" else "Create"
+        dialogBinding.btnCreate.setOnClickListener {
+            val name = dialogBinding.editTextListName.text.toString().trim()
+            if (name.isEmpty()) return@setOnClickListener showToast("List name cannot be empty")
+            if (isEditing) existingList?.id?.let { updateExistingList(it, name, selectedEmails.toList()) }
+            else createNewList(name, selectedEmails.toList())
+            dialog.dismiss()
+        }
     }
 
-    private fun updateFriendsUI(
-        dialogBinding: DialogModifyListBinding,
-        friendsMap: Map<String, String>,
-        selectedEmails: MutableSet<String>
-    ) {
+    private fun updateFriendsUI(dialogBinding: DialogModifyListBinding, friendsMap: Map<String, String>, selectedEmails: MutableSet<String>) {
         toggleNoFriendsMessage(dialogBinding, friendsMap.isEmpty())
 
         val friendsList = friendsMap.map { Friend(it.value, it.key) }
-        Log.d("DEBUG", "Converted friends list: $friendsList")
-
-        val adapter = FriendSelectionAdapter(
-            context = this,
-            friendsList = friendsList,
-            selectedEmails = selectedEmails,
-            onFriendChecked = { friend, isChecked ->
-                if (isChecked) selectedEmails.add(friend.email)
-                else selectedEmails.remove(friend.email)
-                Log.d("DEBUG", "Friend checked: ${friend.email}, isChecked: $isChecked")
-            },
-            showCheckBox = true
-        )
+        val adapter = FriendSelectionAdapter(this, friendsList, selectedEmails, { friend, isChecked ->
+            if (isChecked) selectedEmails.add(friend.email) else selectedEmails.remove(friend.email)
+        }, showCheckBox = true)
 
         dialogBinding.listViewMembers.adapter = adapter
         adapter.notifyDataSetChanged()
@@ -436,70 +329,24 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.listViewMembers.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
-    private fun createNewList(listName: String, selectedEmails: List<String>) {
+    private fun createNewList(listName: String, accessEmails: List<String>) {
         val userEmail = auth.currentUser?.email ?: return
-        val newList = mapOf(
-            "listName" to listName,
-            "owner" to userEmail,
-            "accessEmails" to selectedEmails
-        )
-
-        db.collection("shopping_lists").add(newList)
-            .addOnSuccessListener { showToast("List created successfully") }
-            .addOnFailureListener { showToast("Failed to create list") }
+        val newList = mapOf("listName" to listName, "owner" to userEmail, "accessEmails" to accessEmails)
+        db.collection("shopping_lists").add(newList).addOnSuccessListener {
+            showToast("List created successfully")
+        }.addOnFailureListener { showToast("Failed to create list") }
     }
 
-    private fun updateExistingList(listId: String, listName: String, selectedEmails: List<String>) {
-        val updates = mapOf(
-            "listName" to listName, // ✅ Fix: Ensure correct field name
-            "accessEmails" to selectedEmails
-        )
-
-        db.collection("shopping_lists").document(listId)
-            .update(updates)
-            .addOnSuccessListener {
-                showToast("List updated successfully")
-                listAdapter.clearSelection()  // ✅ Deselect all items
-                toggleSelectionMode(false)   // ✅ Exit selection mode
-            }
-            .addOnFailureListener {
-                showToast("Failed to update list")
-            }
+    private fun updateExistingList(listId: String, name: String, accessEmails: List<String>) {
+        val updates = mapOf("listName" to name, "accessEmails" to accessEmails)
+        db.collection("shopping_lists").document(listId).update(updates).addOnSuccessListener {
+            showToast("List updated successfully")
+            listAdapter.clearSelection()
+            toggleSelectionMode(false)
+        }.addOnFailureListener { showToast("Failed to update list") }
     }
 
-    @SuppressLint("SetTextI18n")
-    private fun showDeleteConfirmation(listName: String) {
-        val dialogBinding = DialogConfirmBinding.inflate(LayoutInflater.from(this))
-        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        dialogBinding.listName.text = "Delete '$listName'?"
-
-        dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
-        dialogBinding.btnDelete.setOnClickListener {
-            deleteList(listName)
-            dialog.dismiss()
-        }
-
-        dialog.show()
-    }
-
-    private fun deleteList(listName: String) {
-        db.collection("shopping_lists")
-            .whereEqualTo("listName", listName)
-            .get()
-            .addOnSuccessListener { documents ->
-                for (doc in documents) {
-                    db.collection("shopping_lists").document(doc.id).delete()
-                        .addOnSuccessListener { showToast("List deleted") }
-                        .addOnFailureListener { showToast("Failed to delete list") }
-                }
-            }
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
+    private fun showToast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
     override fun onDestroy() {
         realTimeListeners.forEach { it.remove() }
@@ -510,32 +357,18 @@ class ListManagementActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (listAdapter.isSelectionModeActive()) {
             listAdapter.clearSelection()
-            toggleSelectionMode(false) // Exit selection mode
-        } else {
-            super.onBackPressed() // Default behavior (exit activity)
-        }
+            toggleSelectionMode(false)
+        } else super.onBackPressed()
     }
 
     private fun setupDragAndDrop() {
         val callback = object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0) {
-            override fun onMove(
-                recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder,
-                target: RecyclerView.ViewHolder
-            ): Boolean {
-                val fromPosition = viewHolder.adapterPosition
-                val toPosition = target.adapterPosition
-                listAdapter.moveItem(fromPosition, toPosition)
+            override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
+                listAdapter.moveItem(vh.adapterPosition, target.adapterPosition)
                 return true
             }
-
-            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
-                // No swipe functionality needed here, so we can leave this empty
-            }
+            override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
         }
-
-        val touchHelper = ItemTouchHelper(callback)
-        touchHelper.attachToRecyclerView(binding.recyclerView)
+        ItemTouchHelper(callback).attachToRecyclerView(binding.recyclerView)
     }
-
-
 }
