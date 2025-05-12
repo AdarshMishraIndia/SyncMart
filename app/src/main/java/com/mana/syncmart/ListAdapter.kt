@@ -1,7 +1,5 @@
 package com.mana.syncmart
 
-import android.os.Handler
-import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -49,13 +47,16 @@ class ListAdapter(
 
         private fun updateItemBackground(item: ShoppingList) {
             val userEmail = AuthUtils.getCurrentUser()?.email
-            val background = when {
+            val backgroundRes = when {
                 selectedItems.contains(item.id) -> R.drawable.selected_bg
                 item.owner == userEmail -> R.drawable.list_bg_owner
                 else -> R.drawable.list_bg
             }
-            binding.root.setBackgroundResource(background)
+
+            binding.root.setBackgroundResource(backgroundRes)
         }
+
+
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -74,7 +75,6 @@ class ListAdapter(
         isSelectionMode = selectedItems.isNotEmpty()
         onSelectionChanged(isSelectionMode, selectedItems.size)
 
-        // More efficient than notifyDataSetChanged(), only notify the affected item
         notifyItemChanged(currentList.indexOfFirst { it.id == listId })
     }
 
@@ -96,16 +96,29 @@ class ListAdapter(
     }
 
     fun updateListPreserveSelection(newLists: List<ShoppingList>) {
-        val sortedLists = newLists.sortedBy { it.position }
+        val sortedLists = newLists.sortedBy { it.position }  // Ensure the lists are sorted by their position.
+
+        // Save the current selection so it can be restored after the list update
         val previousSelection = selectedItems.toSet()
 
+        // Use submitList to trigger a diff update (this is more efficient than notifyDataSetChanged())
         submitList(sortedLists) {
+            // After the list is submitted, restore the selection state
             selectedItems.clear()
-            selectedItems.addAll(sortedLists.filter { previousSelection.contains(it.id) }.map { it.id })
+
+            // Add the items that were previously selected (if they still exist in the updated list)
+            selectedItems.addAll(
+                sortedLists.filter { previousSelection.contains(it.id) }.map { it.id }
+            )
+
+            // Set selection mode based on whether there are any selected items
             isSelectionMode = selectedItems.isNotEmpty()
+
+            // Update the selection status externally
             onSelectionChanged(isSelectionMode, selectedItems.size)
         }
     }
+
 
     fun moveItem(fromPosition: Int, toPosition: Int) {
         if (fromPosition == toPosition) return
@@ -119,32 +132,24 @@ class ListAdapter(
         }
     }
 
-    fun removeItemById(itemId: String) {
-        val updatedList = currentList.toMutableList()
-        val index = updatedList.indexOfFirst { it.id == itemId }
-        if (index != -1) {
-            updatedList.removeAt(index)
-            submitList(updatedList) {
-                // DiffUtil will handle animations for us here
-            }
-
-            // Also update selection state
-            selectedItems.remove(itemId)
-            isSelectionMode = selectedItems.isNotEmpty()
-            onSelectionChanged(isSelectionMode, selectedItems.size)
-        }
-    }
-
     private fun persistItemPositions(lists: List<ShoppingList>) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            lists.forEachIndexed { index, item ->
-                item.position = index
-                FirebaseFirestore.getInstance()
-                    .collection("shopping_lists")
-                    .document(item.id)
-                    .update("position", index)
+        val batch = FirebaseFirestore.getInstance().batch()
+
+        lists.forEachIndexed { index, item ->
+            item.position = index
+            val docRef = FirebaseFirestore.getInstance().collection("shopping_lists").document(item.id)
+            batch.update(docRef, "position", index)
+        }
+
+        // Commit the batch in one go
+        batch.commit()
+            .addOnSuccessListener {
+                // Handle success
             }
-        }, 300) // Delay to allow RecyclerView animations to finish
+            .addOnFailureListener {
+                // Handle failure
+            }
     }
+
 }
 

@@ -65,40 +65,66 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun checkAndClearFinishedItems() {
+        if (listId == null) {
+            showCustomToast("❌ listId is null, cannot check for cleanup.")
+            return
+        }
+
         val sharedPreferences = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-        val lastClearedDate = sharedPreferences.getString("lastClearedDate", null)
-        val currentDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val key = "lastClearedDate_$listId"
+        val lastClearedDate = sharedPreferences.getString(key, null)
 
-        showCustomToast("📆 Last cleared: ${lastClearedDate ?: "N/A"} | Today: $currentDate")
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val currentDate = dateFormat.format(Date())
 
-        if (!lastClearedDate.isNullOrEmpty() && lastClearedDate != currentDate) {
-            showCustomToast("🕒 New day detected. Clearing finished items.")
-            clearFinishedItems()
-            sharedPreferences.edit { putString("lastClearedDate", currentDate) }
-        } else if (lastClearedDate.isNullOrEmpty()) {
-            showCustomToast("🆕 First-time setup. Saving today's date.")
-            sharedPreferences.edit { putString("lastClearedDate", currentDate) }
-        } else {
-            showCustomToast("✅ Already cleared today. No action needed.")
+        val calendar = Calendar.getInstance()
+        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
+
+        if (lastClearedDate == null) {
+            // First-time setup
+            sharedPreferences.edit { putString(key, currentDate) }
+            return
+        }
+
+        try {
+            val lastDate = dateFormat.parse(lastClearedDate)
+            val today = dateFormat.parse(currentDate)
+
+            val daysDiff = if (lastDate != null && today != null) {
+                ((today.time - lastDate.time) / (1000 * 60 * 60 * 24)).toInt()
+            } else {
+                showCustomToast("❌ Failed to calculate date difference. Skipping cleanup.")
+                return
+            }
+
+            when {
+                daysDiff >= 2 -> {
+                    // More than one day passed, clean immediately
+                    clearFinishedItemsForList(key, currentDate)
+                }
+                daysDiff == 1 && currentHour >= 23 -> {
+                    // One day passed and it's after 11PM
+                    clearFinishedItemsForList(key, currentDate)
+                }
+            }
+        } catch (e: Exception) {
+            showCustomToast("❌ Date parsing error: ${e.message}")
         }
     }
 
-
-    private fun clearFinishedItems() {
-        showCustomToast("🧹 Attempting to clear finished items...")
-
+    private fun clearFinishedItemsForList(prefKey: String, currentDate: String) {
         listId?.let { id ->
             db.collection("shopping_lists").document(id)
                 .update("finishedItems", arrayListOf<String>())
                 .addOnSuccessListener {
-                    showCustomToast("✅ Finished items cleared successfully.")
+                    val sharedPreferences = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
+                    sharedPreferences.edit { putString(prefKey, currentDate) }
                 }
                 .addOnFailureListener { e ->
                     showCustomToast("❌ Error clearing finished items: ${e.message}")
                 }
-        } ?: showCustomToast("⚠️ listId is null, cannot clear finished items.")
+        } ?: showCustomToast("❌ listId is null, cannot clear finished items.")
     }
-
 
     private fun setupViewPager() {
         val adapter = ViewPagerAdapter(this)
@@ -136,7 +162,7 @@ class ListActivity : AppCompatActivity() {
             val inputText = editTextMultiLine.text.toString().trim()
 
             if (inputText.isEmpty()) {
-                showCustomToast("⚠️ Please enter at least one item.")
+                showCustomToast("❌ Please enter at least one item.")
                 dialog.dismiss() // Close the dialog and do nothing
             } else {
                 val itemsList = inputText.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
@@ -152,8 +178,6 @@ class ListActivity : AppCompatActivity() {
         listId?.let { id ->
             db.collection("shopping_lists").document(id)
                 .update("pendingItems", FieldValue.arrayUnion(*items.toTypedArray()))
-                .addOnSuccessListener {
-                }
                 .addOnFailureListener {
                     showCustomToast("❌ Unable to add items. Please try again.")
                 }
@@ -168,7 +192,7 @@ class ListActivity : AppCompatActivity() {
                         val pendingItems = (document.get("pendingItems") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
                         if (pendingItems.isEmpty()) {
-                            showCustomToast("⚠️ No items to share.")
+                            showCustomToast("❌ No items to share.")
                             return@addOnSuccessListener
                         }
 
@@ -183,7 +207,7 @@ class ListActivity : AppCompatActivity() {
                     }
                 }
                 .addOnFailureListener {
-                    showCustomToast("❌ Unable to fetch items. Please try again.")
+                    showCustomToast("❌ Unable to fetch items.")
                 }
         }
     }
@@ -203,5 +227,4 @@ class ListActivity : AppCompatActivity() {
 
         toast.show()
     }
-
 }
