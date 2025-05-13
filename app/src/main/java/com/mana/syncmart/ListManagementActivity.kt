@@ -4,15 +4,18 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
-import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -20,6 +23,12 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.ActivityListManagementBinding
 import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.DialogModifyListBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 @Suppress("UNCHECKED_CAST", "DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
@@ -56,6 +65,22 @@ class ListManagementActivity : AppCompatActivity() {
         binding.floatingActionButton.setOnClickListener {
             showModifyDialog(isEditing = false)
         }
+
+        var isRequestInProgress = false
+
+        binding.buttonSendWappNotif.setOnClickListener {
+            if (!isRequestInProgress) {
+                isRequestInProgress = true
+                binding.buttonSendWappNotif.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                sendWhatsAppNotification {
+                    // Callback after request is complete
+                    isRequestInProgress = false
+                    binding.buttonSendWappNotif.setBackgroundColor(ContextCompat.getColor(this, R.color.dark_green))
+                }
+            }
+        }
+
+
     }
 
     private fun setupNavigationDrawer() {
@@ -98,7 +123,7 @@ class ListManagementActivity : AppCompatActivity() {
                 }
             }
             .addOnFailureListener {
-                showToast("Failed to fetch user profile")
+                showCustomToast("Failed to fetch user profile")
             }
     }
 
@@ -220,7 +245,7 @@ class ListManagementActivity : AppCompatActivity() {
                 fetchShoppingLists()
             }
             .addOnFailureListener {
-                showToast("Failed to delete lists")
+                showCustomToast("Failed to delete lists")
             }
     }
 
@@ -301,11 +326,11 @@ class ListManagementActivity : AppCompatActivity() {
                         )
                     }
                     .addOnFailureListener {
-                        showToast("Failed to fetch lists with access")
+                        showCustomToast("Failed to fetch lists with access")
                     }
             }
             .addOnFailureListener {
-                showToast("Failed to fetch shopping lists")
+                showCustomToast("Failed to fetch shopping lists")
             }
     }
 
@@ -365,7 +390,7 @@ class ListManagementActivity : AppCompatActivity() {
         val userEmail = auth.currentUser?.email ?: return
         val newList = mapOf("listName" to listName, "owner" to userEmail, "accessEmails" to accessEmails)
         db.collection("shopping_lists").add(newList).addOnFailureListener {
-            showToast("Failed to create list")
+            showCustomToast("Failed to create list")
         }
     }
 
@@ -377,11 +402,64 @@ class ListManagementActivity : AppCompatActivity() {
                 toggleSelectionMode(false)
             }
             .addOnFailureListener {
-                showToast("Failed to update list")
+                showCustomToast("Failed to update list")
             }
     }
 
-    private fun showToast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+    private fun sendWhatsAppNotification(onComplete: () -> Unit) {
+        val apiUrl = "https://bhashsms.com/api/sendmsg.php?" +
+                "user=Urban_BW&pass=ucbl123&sender=BUZWAP&" +
+                "phone=9040292104&text=dddd&priority=wa&stype=normal&params="
+
+        // Launch a coroutine to handle the API request
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                // Show the "Notification Sent" toast immediately
+                showCustomToast("Sending Notification...")
+
+                // Perform the API call in the background
+                withContext(Dispatchers.IO) {
+                    val url = URL(apiUrl)
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 5000
+                    conn.readTimeout = 5000
+
+                    // Make the request
+                    conn.connect()
+
+                    // Check the response code to see if the request was successful
+                    val responseCode = conn.responseCode
+                    if (responseCode !in 200..299) {
+                        // If the response code indicates failure, show failure toast
+                        withContext(Dispatchers.Main) {
+                            showCustomToast("❌ Failed to send notification. Please try again.")
+                        }
+                    }
+
+                }
+
+            } catch (_: java.net.SocketTimeoutException) {
+                // Timeout error
+                withContext(Dispatchers.Main) {
+                }
+            } catch (_: java.io.IOException) {
+                // Network error (e.g., no internet connection)
+                withContext(Dispatchers.Main) {
+                }
+            } catch (_: Exception) {
+                // Handle any other unexpected errors
+                withContext(Dispatchers.Main) {
+                }
+            } finally {
+                // Reset button state after the API call completes, regardless of outcome
+                showCustomToast("✅ Notification Sent")
+                withContext(Dispatchers.Main) {
+                    onComplete()
+                }
+            }
+        }
+    }
 
     override fun onDestroy() {
         realTimeListeners.forEach { it.remove() }
@@ -406,5 +484,21 @@ class ListManagementActivity : AppCompatActivity() {
             override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
         }
         ItemTouchHelper(callback).attachToRecyclerView(binding.recyclerView)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun showCustomToast(message: String) {
+        val inflater = LayoutInflater.from(this)
+        val layout = inflater.inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
+
+        val toastText = layout.findViewById<TextView>(R.id.toast_text)
+        toastText.text = message
+
+        val toast = Toast(this)
+        toast.duration = Toast.LENGTH_LONG
+        toast.setGravity(Gravity.CENTER, 0, 0) // ✅ Center toast on screen
+        toast.view = layout
+
+        toast.show()
     }
 }

@@ -111,6 +111,22 @@
                 app:layout_constraintEnd_toEndOf="parent"
                 app:srcCompat="@android:drawable/ic_input_add" />
 
+            <Button
+                android:id="@+id/buttonSendWappNotif"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_marginBottom="20dp"
+                android:textStyle="bold"
+                android:shadowRadius="10"
+                android:shadowColor="#000000"
+                android:backgroundTint="#22A422"
+                android:text="Send WApp Notification\nto Baba"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                tools:ignore="HardcodedText" />
+
+
         </androidx.constraintlayout.widget.ConstraintLayout>
     </LinearLayout>
 
