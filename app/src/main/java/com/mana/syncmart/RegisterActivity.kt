@@ -1,9 +1,11 @@
 package com.mana.syncmart
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -12,83 +14,155 @@ import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.firestore.FieldValue
 
 class RegisterActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
 
+    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
 
         auth = FirebaseAuth.getInstance()
 
-        // ✅ Redirect if already signed in
-        if (auth.currentUser != null) {
-            startActivity(Intent(this, ListManagementActivity::class.java))
-            finish()
-            return
-        }
+        val isEditingProfile = intent.getBooleanExtra("isEditingProfile", false)
 
         val emailEditText = findViewById<EditText>(R.id.emailEditText)
         val passwordEditText = findViewById<EditText>(R.id.passwordEditText)
         val registerButton = findViewById<Button>(R.id.registerButton)
         val loginTextView = findViewById<TextView>(R.id.textView4)
+        val nameEditText = findViewById<EditText>(R.id.nameEditText)
+        val titleText = findViewById<TextView>(R.id.textView)
+        val alreadyAccountText = findViewById<TextView>(R.id.textView2)
 
-        registerButton.setOnClickListener {
-            val email = emailEditText.text.toString().trim()
-            val password = passwordEditText.text.toString().trim()
+        if (isEditingProfile) {
+            // Adjust UI
+            emailEditText.visibility = View.GONE
+            loginTextView.visibility = View.GONE
+            alreadyAccountText.visibility = View.GONE
+            titleText.text = "Edit Profile"
+            registerButton.text = "Update Profile"
 
-            when {
-                email.isEmpty() && password.isEmpty() -> showCustomToast("⚠\uFE0F Email & Password cannot be empty")
-                email.isEmpty() -> showCustomToast("⚠\uFE0F Email cannot be empty")
-                password.isEmpty() -> showCustomToast("⚠\uFE0F Password cannot be empty")
-                password.length < 6 -> showCustomToast("⚠\uFE0F Password must be at least 6 characters long")
-                else -> registerUser(email, password)
+            // 👁 Show password in plain text
+            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+
+            val user = auth.currentUser
+            val email = user?.email
+
+            if (email != null) {
+                val docRef = FirebaseFirestore.getInstance().collection("Users").document(email)
+                docRef.get().addOnSuccessListener { doc ->
+                    nameEditText.setText(doc.getString("name") ?: "")
+                    passwordEditText.setText(doc.getString("shadowPassword") ?: "")
+                }
+            }
+
+            registerButton.setOnClickListener {
+                val newName = nameEditText.text.toString().trim()
+                val newPassword = passwordEditText.text.toString().trim()
+
+                if (newName.isEmpty()) {
+                    showCustomToast("⚠️ Name cannot be empty")
+                    return@setOnClickListener
+                }
+                if (newPassword.isEmpty()) {
+                    showCustomToast("⚠️ Password cannot be empty")
+                    return@setOnClickListener
+                }
+
+                val user = auth.currentUser
+                val email = user?.email ?: return@setOnClickListener
+
+                val userDoc = FirebaseFirestore.getInstance().collection("Users").document(email)
+                userDoc.get().addOnSuccessListener { doc ->
+                    val currentName = doc.getString("name") ?: ""
+                    val currentPassword = doc.getString("shadowPassword") ?: ""
+
+                    val updates = mutableMapOf<String, Any>()
+                    var needsUpdate = false
+
+                    if (newName != currentName) {
+                        updates["name"] = newName
+                        needsUpdate = true
+                    }
+
+                    if (newPassword != currentPassword) {
+                        user.updatePassword(newPassword).addOnFailureListener {
+                            showCustomToast("❌ Failed to update password: ${it.message}")
+                            return@addOnFailureListener
+                        }
+                        updates["shadowPassword"] = newPassword
+                        needsUpdate = true
+                    }
+
+                    if (needsUpdate) {
+                        userDoc.update(updates).addOnSuccessListener {
+                            showCustomToast("✅ Profile updated")
+                            startActivity(Intent(this, ListManagementActivity::class.java))
+                            finish()
+                        }.addOnFailureListener {
+                            showCustomToast("❌ Update failed: ${it.message}")
+                        }
+                    } else {
+                        showCustomToast("No changes made")
+                        startActivity(Intent(this, ListManagementActivity::class.java))
+                        finish()
+                    }
+                }
             }
         }
+        else {
+            // Normal registration flow
+            if (auth.currentUser != null) {
+                startActivity(Intent(this, ListManagementActivity::class.java))
+                finish()
+                return
+            }
 
-        loginTextView.setOnClickListener {
-            startActivity(Intent(this, LoginActivity::class.java))
-            finish()
+            registerButton.setOnClickListener {
+                val email = emailEditText.text.toString().trim()
+                val password = passwordEditText.text.toString().trim()
+                val name = nameEditText.text.toString().trim()
+
+                when {
+                    name.isEmpty() -> showCustomToast("⚠️ Name cannot be empty")
+                    email.isEmpty() && password.isEmpty() -> showCustomToast("⚠️ Email & Password cannot be empty")
+                    email.isEmpty() -> showCustomToast("⚠️ Email cannot be empty")
+                    password.isEmpty() -> showCustomToast("⚠️ Password cannot be empty")
+                    password.length < 6 -> showCustomToast("⚠️ Password must be at least 6 characters long")
+                    else -> registerUser(email, password, name)
+                }
+            }
+
+            loginTextView.setOnClickListener {
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+            }
         }
     }
 
-    private fun registerUser(email: String, password: String) {
+    private fun registerUser(email: String, password: String, name: String) {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    val userId = email
-                    val userDocRef = FirebaseFirestore.getInstance().collection("Users").document(userId)
+                    val userDocRef = FirebaseFirestore.getInstance().collection("Users").document(email)
 
-                    // Generate FCM Token
-                    FirebaseMessaging.getInstance().token
-                        .addOnCompleteListener { tokenTask ->
-                            if (tokenTask.isSuccessful) {
-                                val token = tokenTask.result
+                    val userData = hashMapOf(
+                        "name" to name,
+                        "shadowPassword" to password,
+                        "friendsMap" to hashMapOf<String, String>()
+                    )
 
-                                // Check if user already exists in Firestore
-                                userDocRef.get().addOnSuccessListener { document ->
-                                    if (document.exists()) {
-                                        // If user exists, update tokens array
-                                        userDocRef.update("tokens", FieldValue.arrayUnion(token))
-                                    } else {
-                                        // If new user, create document
-                                        val userData = hashMapOf(
-                                            "friendsMap" to hashMapOf<String, String>(), // Empty map
-                                            "tokens" to listOf(token) // Store token in array
-                                        )
-                                        userDocRef.set(userData)
-                                    }
-                                }
-                            }
+                    userDocRef.set(userData)
+                        .addOnSuccessListener {
+                            showCustomToast("✅ Registration Successful")
+                            startActivity(Intent(this, ListManagementActivity::class.java))
+                            finish()
                         }
-
-                    showCustomToast("✅ Registration Successful")
-                    startActivity(Intent(this, ListManagementActivity::class.java))
-                    finish()
+                        .addOnFailureListener { e ->
+                            showCustomToast("❌ Firestore Error: ${e.message}")
+                        }
                 } else {
                     handleRegisterError(task.exception)
                 }
@@ -103,20 +177,17 @@ class RegisterActivity : ComponentActivity() {
         showCustomToast(errorMessage)
     }
 
-    // ✅ Custom toast method with suppressed deprecation warning
     @Suppress("DEPRECATION")
     private fun showCustomToast(message: String) {
         val inflater = LayoutInflater.from(this)
         val layout = inflater.inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
-
         val toastText = layout.findViewById<TextView>(R.id.toast_text)
         toastText.text = message
 
         val toast = Toast(this)
         toast.duration = Toast.LENGTH_LONG
-        toast.setGravity(Gravity.BOTTOM, 0, 200) // Positioned at bottom with 200dp offset
-        toast.view = layout // Deprecated but suppressed for compatibility
-
+        toast.setGravity(Gravity.BOTTOM, 0, 200)
+        toast.view = layout
         toast.show()
     }
 }

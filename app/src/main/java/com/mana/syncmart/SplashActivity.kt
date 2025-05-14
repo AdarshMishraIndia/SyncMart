@@ -21,11 +21,11 @@ class SplashActivity : AppCompatActivity() {
             val nextActivity = if (auth.currentUser != null) {
                 ListManagementActivity::class.java // User logged in
             } else {
-                LoginActivity::class.java // User not logged in
+                RegisterActivity::class.java // User not logged in
             }
             startActivity(Intent(this, nextActivity))
             overridePendingTransition(R.anim.splash_fade_in, R.anim.splash_fade_out)
             finish()
-        }, 2000) // 2-second delay
+        }, 1000) // 2-second delay
     }
 }

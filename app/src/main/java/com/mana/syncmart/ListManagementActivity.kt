@@ -62,6 +62,8 @@ class ListManagementActivity : AppCompatActivity() {
         fetchUserName()
         fetchShoppingLists()
 
+
+
         binding.floatingActionButton.setOnClickListener {
             showModifyDialog(isEditing = false)
         }
@@ -107,9 +109,64 @@ class ListManagementActivity : AppCompatActivity() {
                     logoutUser()
                     true
                 }
+                R.id.nav_delete_account -> {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    confirmDeleteAccount()
+                    true
+                }
+                R.id.nav_edit_profile -> {
+                    drawerLayout.closeDrawer(GravityCompat.START)
+                    val intent = Intent(this, RegisterActivity::class.java)
+                    intent.putExtra("isEditingProfile", true)
+                    startActivity(intent)
+                    true
+                }
                 else -> false
             }
         }
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun confirmDeleteAccount() {
+        val dialogBinding = DialogConfirmBinding.inflate(LayoutInflater.from(this))
+        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+
+        dialogBinding.listName.text = "Are you sure you want to delete your account?"
+        dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
+        dialogBinding.btnDelete.setOnClickListener {
+            dialog.dismiss()
+            deleteAccount()
+        }
+
+        dialog.show()
+    }
+
+    private fun deleteAccount() {
+        val user = auth.currentUser ?: return
+        val userEmail = user.email ?: return
+
+        showCustomToast("Deleting account...")
+
+        // Step 1: Delete Firestore user document
+        db.collection("Users").document(userEmail).delete()
+            .addOnSuccessListener {
+                // Step 2: Delete Firebase auth user
+                user.delete()
+                    .addOnSuccessListener {
+                        showCustomToast("✅ Account deleted successfully")
+                        startActivity(Intent(this, RegisterActivity::class.java).apply {
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        })
+                        finish()
+                    }
+                    .addOnFailureListener {
+                        showCustomToast("❌ Failed to delete authentication account. Please re-authenticate.")
+                    }
+            }
+            .addOnFailureListener {
+                showCustomToast("❌ Failed to delete Firestore account.")
+            }
     }
 
     private fun fetchUserName() {
