@@ -31,7 +31,9 @@
         <!-- Email Input -->
         <EditText
             android:id="@+id/emailEditText"
-            android:layout_width="0dp"
+            android:layout_width="370dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:layout_height="48dp"
             android:autofillHints=""
             android:hint="@string/hint_email"
@@ -48,9 +50,11 @@
         <!-- Password Input -->
         <EditText
             android:id="@+id/passwordEditText"
-            android:layout_width="0dp"
+            android:layout_width="370dp"
             android:layout_height="48dp"
             android:autofillHints=""
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:hint="@string/hint_password"
             android:background="#8FFFFFFF"
             android:inputType="textPassword"

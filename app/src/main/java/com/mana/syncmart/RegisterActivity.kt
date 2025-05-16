@@ -63,7 +63,9 @@ class RegisterActivity : ComponentActivity() {
             passwordEditText.setOnTouchListener { v, event ->
                 val drawableEnd = 2
                 if (event.action == android.view.MotionEvent.ACTION_UP) {
-                    if (event.rawX >= (passwordEditText.right - passwordEditText.compoundDrawables[drawableEnd].bounds.width())) {
+                    val extraTapArea = (24 * resources.displayMetrics.density).toInt() // convert 24dp to pixels
+                    val drawableWidth = passwordEditText.compoundDrawables[drawableEnd]?.bounds?.width() ?: 0
+                    if (event.rawX >= (passwordEditText.right - drawableWidth - extraTapArea)) {
                         // Toggle password visibility
                         isPasswordVisible = !isPasswordVisible
                         if (isPasswordVisible) {

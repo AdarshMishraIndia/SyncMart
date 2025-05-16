@@ -30,8 +30,10 @@
         <!-- Email Input -->
         <EditText
             android:id="@+id/emailEditText"
-            android:layout_width="355dp"
+            android:layout_width="370dp"
             android:layout_height="48dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
             android:layout_marginHorizontal="32dp"
             android:layout_marginTop="10dp"
             android:autofillHints=""
@@ -46,7 +48,9 @@
 
         <EditText
             android:id="@+id/nameEditText"
-            android:layout_width="355dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:layout_width="370dp"
             android:layout_height="48dp"
             android:layout_marginHorizontal="32dp"
             android:layout_marginTop="10dp"
@@ -63,11 +67,13 @@
         <!-- Password Input -->
         <EditText
             android:id="@+id/passwordEditText"
-            android:layout_width="355dp"
+            android:layout_width="370dp"
             android:layout_height="48dp"
             android:layout_marginHorizontal="32dp"
             android:layout_marginTop="10dp"
             android:autofillHints=""
+            android:paddingEnd="10dp"
+            android:paddingStart="10dp"
             android:background="#8FFFFFFF"
             android:drawableEnd="@drawable/ic_visibility_off"
             android:hint="Enter password (Minimum 6 Characters)"
