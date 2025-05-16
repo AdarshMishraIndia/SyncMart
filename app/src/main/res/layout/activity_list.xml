@@ -36,9 +36,9 @@
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/viewPager"
             android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+            android:layout_height="match_parent"
+            android:layout_marginBottom="100dp"/>
 
-        <!-- Floating ImageButton in the Lower Right Corner -->
         <ImageButton
             android:id="@+id/addElementButton"
             android:layout_width="56dp"
@@ -58,8 +58,8 @@
             android:layout_height="56dp"
             android:layout_alignParentEnd="true"
             android:layout_alignParentBottom="true"
-            android:layout_marginEnd="26dp"
-            android:layout_marginBottom="104dp"
+            android:layout_marginEnd="93dp"
+            android:layout_marginBottom="26dp"
             android:background="@drawable/circ_btn_bg"
             android:contentDescription="@string/add"
             android:scaleType="centerInside"

@@ -19,7 +19,7 @@ class RegisterActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
 
-    @SuppressLint("SetTextI18n")
+    @SuppressLint("SetTextI18n", "ClickableViewAccessibility")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_register)
@@ -56,6 +56,29 @@ class RegisterActivity : ComponentActivity() {
                     nameEditText.setText(doc.getString("name") ?: "")
                     passwordEditText.setText(doc.getString("shadowPassword") ?: "")
                 }
+            }
+
+            var isPasswordVisible = false
+
+            passwordEditText.setOnTouchListener { v, event ->
+                val drawableEnd = 2
+                if (event.action == android.view.MotionEvent.ACTION_UP) {
+                    if (event.rawX >= (passwordEditText.right - passwordEditText.compoundDrawables[drawableEnd].bounds.width())) {
+                        // Toggle password visibility
+                        isPasswordVisible = !isPasswordVisible
+                        if (isPasswordVisible) {
+                            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                            passwordEditText.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_visibility_off, 0)
+                        } else {
+                            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+                            passwordEditText.setCompoundDrawablesWithIntrinsicBounds(0, 0, R.drawable.ic_visibility_on, 0)
+                        }
+                        // Move cursor to the end
+                        passwordEditText.setSelection(passwordEditText.text.length)
+                        return@setOnTouchListener true
+                    }
+                }
+                false
             }
 
             registerButton.setOnClickListener {

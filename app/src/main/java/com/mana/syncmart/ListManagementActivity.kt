@@ -64,7 +64,7 @@ class ListManagementActivity : AppCompatActivity() {
 
 
 
-        binding.floatingActionButton.setOnClickListener {
+        binding.addListButton.setOnClickListener {
             showModifyDialog(isEditing = false)
         }
 
@@ -73,16 +73,16 @@ class ListManagementActivity : AppCompatActivity() {
         binding.buttonSendWappNotif.setOnClickListener {
             if (!isRequestInProgress) {
                 isRequestInProgress = true
-                binding.buttonSendWappNotif.setBackgroundColor(ContextCompat.getColor(this, android.R.color.holo_red_dark))
+                // Change background tint instead of background color
+                binding.buttonSendWappNotif.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.holo_red_dark)
+
                 sendWhatsAppNotification {
                     // Callback after request is complete
                     isRequestInProgress = false
-                    binding.buttonSendWappNotif.setBackgroundColor(ContextCompat.getColor(this, R.color.dark_green))
+                    binding.buttonSendWappNotif.backgroundTintList = ContextCompat.getColorStateList(this, R.color.dark_green)
                 }
             }
         }
-
-
     }
 
     private fun setupNavigationDrawer() {
@@ -360,9 +360,19 @@ class ListManagementActivity : AppCompatActivity() {
                             db.collection("shopping_lists")
                                 .whereEqualTo("owner", userEmail)
                                 .addSnapshotListener { snapshot, _ ->
-                                    snapshot?.documents?.forEach { doc ->
-                                        doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                                            combinedLists[doc.id] = it
+                                    if (snapshot == null) return@addSnapshotListener
+
+                                    for (change in snapshot.documentChanges) {
+                                        val docId = change.document.id
+                                        when (change.type) {
+                                            com.google.firebase.firestore.DocumentChange.Type.ADDED,
+                                            com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
+                                                val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
+                                                combinedLists[docId] = list
+                                            }
+                                            com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
+                                                combinedLists.remove(docId)
+                                            }
                                         }
                                     }
                                     updateUI()
@@ -373,14 +383,25 @@ class ListManagementActivity : AppCompatActivity() {
                             db.collection("shopping_lists")
                                 .whereArrayContains("accessEmails", userEmail)
                                 .addSnapshotListener { snapshot, _ ->
-                                    snapshot?.documents?.forEach { doc ->
-                                        doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                                            combinedLists[doc.id] = it
+                                    if (snapshot == null) return@addSnapshotListener
+
+                                    for (change in snapshot.documentChanges) {
+                                        val docId = change.document.id
+                                        when (change.type) {
+                                            com.google.firebase.firestore.DocumentChange.Type.ADDED,
+                                            com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
+                                                val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
+                                                combinedLists[docId] = list
+                                            }
+                                            com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
+                                                combinedLists.remove(docId)
+                                            }
                                         }
                                     }
                                     updateUI()
                                 }
                         )
+
                     }
                     .addOnFailureListener {
                         showCustomToast("Failed to fetch lists with access")

@@ -12,13 +12,12 @@ import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.messaging.FirebaseMessaging
-import com.google.firebase.firestore.FieldValue
 
 class LoginActivity : ComponentActivity() {
 
     private lateinit var auth: FirebaseAuth
+    private lateinit var loginButton: Button // Declare at class level
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -35,7 +34,7 @@ class LoginActivity : ComponentActivity() {
 
         val emailEditText = findViewById<EditText>(R.id.emailEditText)
         val passwordEditText = findViewById<EditText>(R.id.passwordEditText)
-        val loginButton = findViewById<Button>(R.id.loginButton)
+        loginButton = findViewById(R.id.loginButton)
         val registerTextView = findViewById<TextView>(R.id.textView4)
 
         loginButton.setOnClickListener {
@@ -58,21 +57,16 @@ class LoginActivity : ComponentActivity() {
     }
 
     private fun loginUser(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password)
+        val safeEmail = email.trim()
+        val safePassword = password.trim()
+
+        loginButton.isEnabled = false  // Disable to prevent multiple taps
+
+        auth.signInWithEmailAndPassword(safeEmail, safePassword)
             .addOnCompleteListener(this) { task ->
+                loginButton.isEnabled = true // Re-enable after result
+
                 if (task.isSuccessful) {
-                    val userId = email
-                    val userDocRef = FirebaseFirestore.getInstance().collection("Users").document(userId)
-
-                    // Get and update FCM Token
-                    FirebaseMessaging.getInstance().token
-                        .addOnCompleteListener { tokenTask ->
-                            if (tokenTask.isSuccessful) {
-                                val token = tokenTask.result
-                                userDocRef.update("tokens", FieldValue.arrayUnion(token))
-                            }
-                        }
-
                     showCustomToast("✅ Login Successful")
                     startActivity(Intent(this, ListManagementActivity::class.java))
                     finish()
