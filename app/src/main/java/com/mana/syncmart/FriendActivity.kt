@@ -14,6 +14,7 @@ import androidx.drawerlayout.widget.DrawerLayout
 import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.*
 import androidx.appcompat.app.AlertDialog
+import com.google.firebase.auth.FirebaseAuth
 
 
 @Suppress("DEPRECATION")
@@ -65,7 +66,10 @@ class FriendActivity : AppCompatActivity() {
                     finish()
                 }
                 R.id.nav_logout -> {
-                    AuthUtils.logout(this)
+                    FirebaseAuth.getInstance().signOut()
+                    val intent = Intent(this, LoginActivity::class.java)
+                    intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    startActivity(intent)
                 }
             }
             drawerLayout.closeDrawer(GravityCompat.START)
@@ -79,7 +83,7 @@ class FriendActivity : AppCompatActivity() {
         btnAdd = findViewById(R.id.addFriendButton)
 
         // ✅ Get the currently logged-in user
-        val user = AuthUtils.getCurrentUser()
+        val user = FirebaseAuth.getInstance().currentUser
         if (user != null) {
             val userEmail = user.email
             if (userEmail != null) {
@@ -107,7 +111,7 @@ class FriendActivity : AppCompatActivity() {
                         if (friendEmail.isEmpty() || friendName.isEmpty()) {
                             showCustomToast("Both fields are required!")
                         } else {
-                            val user = AuthUtils.getCurrentUser()
+                            val user = FirebaseAuth.getInstance().currentUser
                             if (user != null && user.email != null) {
                                 addFriendToFirestore(user.email!!, friendEmail, friendName)
                                 dialog.dismiss() // Dismiss dialog after adding friend

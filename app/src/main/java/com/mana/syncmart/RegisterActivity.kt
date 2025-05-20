@@ -44,9 +44,6 @@ class RegisterActivity : ComponentActivity() {
             titleText.text = "Edit Profile"
             registerButton.text = "Update Profile"
 
-            // 👁 Show password in plain text
-            passwordEditText.inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-
             val user = auth.currentUser
             val email = user?.email
 

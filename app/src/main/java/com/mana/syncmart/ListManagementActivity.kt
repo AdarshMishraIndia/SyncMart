@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.SocketTimeoutException
+import java.io.IOException
 
 @Suppress("UNCHECKED_CAST", "DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
@@ -70,19 +72,24 @@ class ListManagementActivity : AppCompatActivity() {
 
         var isRequestInProgress = false
 
-        binding.buttonSendWappNotif.setOnClickListener {
+        binding.textViewSendWapp.setOnClickListener {
             if (!isRequestInProgress) {
                 isRequestInProgress = true
-                // Change background tint instead of background color
-                binding.buttonSendWappNotif.backgroundTintList = ContextCompat.getColorStateList(this, android.R.color.holo_red_dark)
 
-                sendWhatsAppNotification {
-                    // Callback after request is complete
+                // Set progress background (red_pink_bg)
+                binding.textViewSendWapp.background =
+                    ContextCompat.getDrawable(this, R.drawable.red_pink_bg)
+
+                sendWhatsAppNotification(success = { wasSuccessful ->
                     isRequestInProgress = false
-                    binding.buttonSendWappNotif.backgroundTintList = ContextCompat.getColorStateList(this, R.color.dark_green)
-                }
+
+                    // Set result background based on success
+                    val drawableRes = if (wasSuccessful) R.drawable.green_blue_bg else R.drawable.red_pink_bg
+                    binding.textViewSendWapp.setBackgroundResource(drawableRes)
+                })
             }
         }
+
     }
 
     private fun setupNavigationDrawer() {
@@ -244,7 +251,6 @@ class ListManagementActivity : AppCompatActivity() {
     @SuppressLint("SetTextI18n")
     private fun toggleSelectionMode(isActive: Boolean, selectedCount: Int = 0) {
         if (isActive && selectedCount > 0) {
-            binding.toolbarTitle.visibility = View.GONE
             binding.toolbarUser.visibility = View.GONE
             binding.toolbar.title = "$selectedCount Selected"
             binding.toolbar.menu.clear()
@@ -258,7 +264,6 @@ class ListManagementActivity : AppCompatActivity() {
 
             binding.toolbar.invalidate()
         } else {
-            binding.toolbarTitle.visibility = View.VISIBLE
             binding.toolbarUser.visibility = View.VISIBLE
             binding.toolbar.title = "SyncMart"
             binding.toolbar.menu.clear()
@@ -484,60 +489,45 @@ class ListManagementActivity : AppCompatActivity() {
             }
     }
 
-    private fun sendWhatsAppNotification(onComplete: () -> Unit) {
+    private fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
         val apiUrl = "https://bhashsms.com/api/sendmsg.php?" +
                 "user=Urban_BW&pass=ucbl123&sender=BUZWAP&" +
                 "phone=9040292104&text=dddd&priority=wa&stype=normal&params="
 
-        // Launch a coroutine to handle the API request
         CoroutineScope(Dispatchers.Main).launch {
-            try {
-                // Show the "Notification Sent" toast immediately
-                showCustomToast("Sending Notification...")
+            var wasSuccessful = false
 
-                // Perform the API call in the background
+            try {
+                showCustomToast("📨 Sending Notification...")
+
                 withContext(Dispatchers.IO) {
                     val url = URL(apiUrl)
                     val conn = url.openConnection() as HttpURLConnection
                     conn.requestMethod = "GET"
                     conn.connectTimeout = 5000
                     conn.readTimeout = 5000
-
-                    // Make the request
                     conn.connect()
 
-                    // Check the response code to see if the request was successful
-                    val responseCode = conn.responseCode
-                    if (responseCode !in 200..299) {
-                        // If the response code indicates failure, show failure toast
-                        withContext(Dispatchers.Main) {
-                            showCustomToast("❌ Failed to send notification. Please try again.")
-                        }
-                    }
-
+                    wasSuccessful = conn.responseCode in 200..299
                 }
 
-            } catch (_: java.net.SocketTimeoutException) {
-                // Timeout error
-                withContext(Dispatchers.Main) {
-                }
-            } catch (_: java.io.IOException) {
-                // Network error (e.g., no internet connection)
-                withContext(Dispatchers.Main) {
-                }
+            } catch (_: SocketTimeoutException) {
+                showCustomToast("⚠️ Request timed out. Please try again.")
+            } catch (_: IOException) {
+                showCustomToast("⚠️ Network error. Check your connection.")
             } catch (_: Exception) {
-                // Handle any other unexpected errors
-                withContext(Dispatchers.Main) {
-                }
+                showCustomToast("❌ Unexpected error occurred.")
             } finally {
-                // Reset button state after the API call completes, regardless of outcome
-                showCustomToast("✅ Notification Sent")
-                withContext(Dispatchers.Main) {
-                    onComplete()
+                // Show toast based on success
+                if (wasSuccessful) {
+                    showCustomToast("✅ Notification Sent")
                 }
+
+                success(wasSuccessful)
             }
         }
     }
+
 
     override fun onDestroy() {
         realTimeListeners.forEach { it.remove() }

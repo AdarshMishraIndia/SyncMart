@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
 
@@ -46,7 +47,7 @@ class ListAdapter(
         }
 
         private fun updateItemBackground(item: ShoppingList) {
-            val userEmail = AuthUtils.getCurrentUser()?.email
+            val userEmail = FirebaseAuth.getInstance().currentUser?.email
             val backgroundRes = when {
                 selectedItems.contains(item.id) -> R.drawable.selected_bg
                 item.owner == userEmail -> R.drawable.list_bg_owner
