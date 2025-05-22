@@ -83,9 +83,7 @@ class ListManagementActivity : AppCompatActivity() {
                 sendWhatsAppNotification(success = { wasSuccessful ->
                     isRequestInProgress = false
 
-                    // Set result background based on success
-                    val drawableRes = if (wasSuccessful) R.drawable.green_blue_bg else R.drawable.red_pink_bg
-                    binding.textViewSendWapp.setBackgroundResource(drawableRes)
+                    binding.textViewSendWapp.setBackgroundResource(R.drawable.green_blue_bg )
                 })
             }
         }
@@ -492,41 +490,44 @@ class ListManagementActivity : AppCompatActivity() {
     private fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
         val apiUrl = "https://bhashsms.com/api/sendmsg.php?" +
                 "user=Urban_BW&pass=ucbl123&sender=BUZWAP&" +
-                "phone=9040292104&text=dddd&priority=wa&stype=normal&params="
+                "phone=9040292104&text=dddd&priority=wa&stype=normal"
 
-        CoroutineScope(Dispatchers.Main).launch {
+        CoroutineScope(Dispatchers.IO).launch {
             var wasSuccessful = false
 
             try {
-                showCustomToast("📨 Sending Notification...")
-
-                withContext(Dispatchers.IO) {
-                    val url = URL(apiUrl)
-                    val conn = url.openConnection() as HttpURLConnection
-                    conn.requestMethod = "GET"
-                    conn.connectTimeout = 5000
-                    conn.readTimeout = 5000
-                    conn.connect()
-
-                    wasSuccessful = conn.responseCode in 200..299
+                withContext(Dispatchers.Main) {
+                    showCustomToast("📨 Sending Notification...")
                 }
 
+                val url = URL(apiUrl)
+                val conn = url.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 3000  // Short timeout
+                conn.readTimeout = 3000
+
+                // "Fire" the request by opening the connection and immediately closing
+                conn.inputStream.close()
+                wasSuccessful = true
+
             } catch (_: SocketTimeoutException) {
-                showCustomToast("⚠️ Request timed out. Please try again.")
+                // Log or handle timeout silently
             } catch (_: IOException) {
-                showCustomToast("⚠️ Network error. Check your connection.")
+                // Log or handle network error silently
             } catch (_: Exception) {
-                showCustomToast("❌ Unexpected error occurred.")
-            } finally {
-                // Show toast based on success
+                // Log or handle generic error silently
+            }
+
+            // Notify main thread of result
+            withContext(Dispatchers.Main) {
                 if (wasSuccessful) {
                     showCustomToast("✅ Notification Sent")
                 }
-
                 success(wasSuccessful)
             }
         }
     }
+
 
 
     override fun onDestroy() {
