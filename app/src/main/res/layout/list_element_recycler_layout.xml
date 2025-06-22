@@ -22,15 +22,14 @@
 
     <!-- Bin (Delete) Button -->
     <ImageButton
-        android:id="@+id/btnDelete"
+        android:id="@+id/btnImportant"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="@string/delete"
+        android:contentDescription="Important"
         android:scaleType="centerInside"
-        android:src="@drawable/ic_bin"
-        app:tint="@android:color/holo_red_dark"
-        tools:ignore="TouchTargetSizeCheck" />
+        android:src="@drawable/ic_star"
+        tools:ignore="HardcodedText,TouchTargetSizeCheck,ImageContrastCheck" />
 
 
     <!-- Gear (Settings) Button -->
@@ -42,6 +41,6 @@
         android:contentDescription="@string/tick"
         android:scaleType="centerInside"
         android:src="@drawable/ic_tick"
-        tools:ignore="TouchTargetSizeCheck,UseAppTint"
-        app:tint="@android:color/holo_green_dark"/>
+        app:tint="@android:color/holo_green_dark"
+        tools:ignore="TouchTargetSizeCheck,UseAppTint,ImageContrastCheck" />
 </LinearLayout>

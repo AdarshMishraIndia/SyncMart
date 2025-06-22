@@ -1,18 +1,15 @@
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <!-- Gradient from Green to Blue -->
-    <gradient
-        android:angle="0"
-        android:startColor="#72A675"
-        android:endColor="#3F8ECC"/>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+android:shape="rectangle">
 
-    <!-- Rounded Corners -->
-    <corners android:radius="16dp"/>
+<corners android:radius="16dp" />
 
-    <!-- Yellow Border -->
-    <stroke
-        android:width="3dp"
-        android:color="#FFD700"/>
+<gradient
+    android:startColor="#72A675"
+    android:endColor="#3F8ECC"
+    android:angle="0" />
 
-    <!-- Padding -->
-    <padding android:left="12dp" android:right="12dp" android:top="8dp" android:bottom="8dp"/>
+<stroke
+    android:width="2dp"
+    android:color="#FFDD00" />
 </shape>
+

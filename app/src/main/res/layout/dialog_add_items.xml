@@ -6,10 +6,10 @@
     android:background="@drawable/dialog_bg"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="20dp">
+    android:orientation="vertical">
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:padding="20dp"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
@@ -29,12 +29,15 @@
 
         <EditText
             android:id="@+id/editTextTextMultiLine"
-            android:layout_width="350dp"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:minWidth="320dp"
+            android:maxWidth="600dp"
             android:background="@drawable/multiline_items"
             android:gravity="start|top"
             android:inputType="textCapSentences|textMultiLine"
             android:padding="10dp"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             tools:ignore="Autofill,LabelFor,SpeakableTextPresentCheck,TouchTargetSizeCheck" />

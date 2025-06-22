@@ -1,230 +1,217 @@
 package com.mana.syncmart
 
-// 🔹 Core Android Functionality
-import android.app.Dialog
-import android.os.Bundle
 import android.content.Intent
-import android.view.Gravity
-import android.view.LayoutInflater
-
-// 🔹 UI Components & User Interaction
-import android.widget.EditText
-import android.widget.ImageButton
+import android.os.Bundle
+import android.view.*
 import android.widget.TextView
 import android.widget.Toast
-
-// 🔹 Firebase Firestore Integration
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FieldValue
-
-// 🔹 Activity Lifecycle & Navigation
-import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.OnBackPressedCallback
-
-// 🔹 ViewPager & TabLayout (UI Navigation)
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.edit
 import com.google.android.material.tabs.TabLayoutMediator
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import com.mana.syncmart.databinding.ActivityListBinding
-
-// 🔹 Date & Time Handling
+import com.mana.syncmart.databinding.DialogAddItemsBinding
 import java.text.SimpleDateFormat
 import java.util.*
-import androidx.core.content.edit
 
+@Suppress("DEPRECATION")
 class ListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityListBinding
     private lateinit var db: FirebaseFirestore
     private var listId: String? = null
+    private var currentListName = "Shopping List"
+    private val menuDeleteId = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        setSupportActionBar(binding.toolbar)
 
         db = FirebaseFirestore.getInstance()
         listId = intent.getStringExtra("LIST_ID")
+        binding.toolbar.title = "Loading..."
 
-        setupViewPager()
-        setupAddElementButton()
-        binding.shareListButton.setOnClickListener {
-            sharePendingItems()
+        if (listId == null) {
+            showToast("❌ Invalid list ID.")
+            fallbackSetup()
+        } else {
+            loadListData(listId!!)
         }
 
-        // Check and clear finished items if the date has changed
+        binding.addElementButton.setOnClickListener { showAddItemsDialog() }
+        binding.shareListButton.setOnClickListener { sharePendingItems() }
         checkAndClearFinishedItems()
 
-        // Handle back button press using OnBackPressedDispatcher
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val intent = Intent(this@ListActivity, ListManagementActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                startActivity(intent)
+                startActivity(Intent(this@ListActivity, ListManagementActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                })
                 finish()
             }
         })
     }
 
-    private fun checkAndClearFinishedItems() {
-        if (listId == null) {
-            showCustomToast("❌ listId is null, cannot check for cleanup.")
-            return
-        }
-
-        val sharedPreferences = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-        val key = "lastClearedDate_$listId"
-        val lastClearedDate = sharedPreferences.getString(key, null)
-
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        val currentDate = dateFormat.format(Date())
-
-        val calendar = Calendar.getInstance()
-        val currentHour = calendar.get(Calendar.HOUR_OF_DAY)
-
-        if (lastClearedDate == null) {
-            // First-time setup
-            sharedPreferences.edit { putString(key, currentDate) }
-            return
-        }
-
-        try {
-            val lastDate = dateFormat.parse(lastClearedDate)
-            val today = dateFormat.parse(currentDate)
-
-            val daysDiff = if (lastDate != null && today != null) {
-                ((today.time - lastDate.time) / (1000 * 60 * 60 * 24)).toInt()
-            } else {
-                showCustomToast("❌ Failed to calculate date difference. Skipping cleanup.")
-                return
-            }
-
-            when {
-                daysDiff >= 2 -> {
-                    // More than one day passed, clean immediately
-                    clearFinishedItemsForList(key, currentDate)
-                }
-                daysDiff == 1 && currentHour >= 23 -> {
-                    // One day passed and it's after 11PM
-                    clearFinishedItemsForList(key, currentDate)
+    private fun loadListData(id: String) {
+        db.collection("shopping_lists").document(id).get()
+            .addOnSuccessListener { document ->
+                if (document.exists()) {
+                    val name = document.getString("listName") ?: "Shopping List"
+                    currentListName = name
+                    binding.toolbar.title = name
+                    setupViewPager(id)
+                } else {
+                    showToast("❌ List not found. Using default.")
+                    fallbackSetup()
                 }
             }
-        } catch (e: Exception) {
-            showCustomToast("❌ Date parsing error: ${e.message}")
-        }
+            .addOnFailureListener {
+                showToast("❌ Failed to fetch list.")
+                fallbackSetup()
+            }
     }
 
-    private fun clearFinishedItemsForList(prefKey: String, currentDate: String) {
-        listId?.let { id ->
-            db.collection("shopping_lists").document(id)
-                .update("finishedItems", arrayListOf<String>())
-                .addOnSuccessListener {
-                    val sharedPreferences = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-                    sharedPreferences.edit { putString(prefKey, currentDate) }
-                }
-                .addOnFailureListener { e ->
-                    showCustomToast("❌ Error clearing finished items: ${e.message}")
-                }
-        } ?: showCustomToast("❌ listId is null, cannot clear finished items.")
-    }
-
-    private fun setupViewPager() {
-        val adapter = ViewPagerAdapter(this)
-        binding.viewPager.adapter = adapter
-
-        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
-            tab.text = when (position) {
-                0 -> "Pending"
-                1 -> "Finished"
-                else -> null
-            }
+    private fun setupViewPager(id: String) {
+        binding.viewPager.adapter = ViewPagerAdapter(this, id, currentListName)
+        TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, pos ->
+            tab.text = if (pos == 0) "Pending" else "Finished"
         }.attach()
     }
 
-    private fun setupAddElementButton() {
-        binding.addElementButton.setOnClickListener {
-            showAddItemsDialog()
-        }
-    }
-
     private fun showAddItemsDialog() {
-        val dialog = Dialog(this)
-        dialog.setContentView(R.layout.dialog_add_items)
-
+        val dialogBinding = DialogAddItemsBinding.inflate(layoutInflater)
+        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.show()
 
-        val editTextMultiLine = dialog.findViewById<EditText>(R.id.editTextTextMultiLine)
-        val sendButton = dialog.findViewById<ImageButton>(R.id.btn_send)
-
-        // Show keyboard automatically when the dialog appears
-        editTextMultiLine.requestFocus()
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
-
-        sendButton.setOnClickListener {
-            val inputText = editTextMultiLine.text.toString().trim()
-
-            if (inputText.isEmpty()) {
-                showCustomToast("❌ Please enter at least one item.")
-                dialog.dismiss() // Close the dialog and do nothing
-            } else {
-                val itemsList = inputText.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-                addItemsToPendingList(itemsList)
-                dialog.dismiss()
+        // Request focus and show keyboard
+        dialogBinding.editTextTextMultiLine.apply {
+            requestFocus()
+            post {
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+                imm.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
             }
         }
 
-        dialog.show()
+        dialogBinding.btnSend.setOnClickListener {
+            val items = dialogBinding.editTextTextMultiLine.text.toString()
+                .trim().lines().map { it.trim() }.filter { it.isNotEmpty() }
+
+            if (items.isEmpty()) showToast("❌ Enter at least one item.")
+            else addItemsToPendingList(items)
+
+            dialog.dismiss()
+        }
     }
 
     private fun addItemsToPendingList(items: List<String>) {
-        listId?.let { id ->
-            db.collection("shopping_lists").document(id)
-                .update("pendingItems", FieldValue.arrayUnion(*items.toTypedArray()))
-                .addOnFailureListener {
-                    showCustomToast("❌ Unable to add items. Please try again.")
-                }
+        listId?.let {
+            db.collection("shopping_lists").document(it)
+                .set(mapOf("pendingItems" to items.associateWith { false }), SetOptions.merge())
+                .addOnFailureListener { showToast("❌ Failed to add items.") }
         }
     }
 
     private fun sharePendingItems() {
-        listId?.let { id ->
-            db.collection("shopping_lists").document(id).get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        val pendingItems = (document.get("pendingItems") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
-
-                        if (pendingItems.isEmpty()) {
-                            showCustomToast("❌ No items to share.")
-                            return@addOnSuccessListener
-                        }
-
-                        val shareText = pendingItems.joinToString("\n") { "• $it" }
-
-                        val intent = Intent(Intent.ACTION_SEND).apply {
+        listId?.let {
+            db.collection("shopping_lists").document(it).get()
+                .addOnSuccessListener { doc ->
+                    val items = (doc["pendingItems"] as? Map<*, *>)?.keys?.filterIsInstance<String>().orEmpty()
+                    if (items.isEmpty()) showToast("❌ No items to share.")
+                    else {
+                        val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
+                            putExtra(Intent.EXTRA_TEXT, items.joinToString("\n") { "• $it" })
                         }
-
-                        startActivity(Intent.createChooser(intent, "Share List"))
+                        startActivity(Intent.createChooser(shareIntent, "Share List"))
                     }
                 }
-                .addOnFailureListener {
-                    showCustomToast("❌ Unable to fetch items.")
-                }
+                .addOnFailureListener { showToast("❌ Unable to fetch items.") }
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun showCustomToast(message: String) {
-        val inflater = LayoutInflater.from(this)
-        val layout = inflater.inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
+    private fun checkAndClearFinishedItems() {
+        val id = listId ?: return showToast("❌ listId is null")
+        val prefs = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
+        val key = "lastClearedDate_$id"
+        val now = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val last = prefs.getString(key, null)
 
-        val toastText = layout.findViewById<TextView>(R.id.toast_text)
-        toastText.text = message
+        if (last == null) {
+            prefs.edit { putString(key, now) }
+            return
+        }
 
-        val toast = Toast(this)
-        toast.duration = Toast.LENGTH_LONG
-        toast.setGravity(Gravity.CENTER, 0, 0) // ✅ Center toast on screen
-        toast.view = layout
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+            val days = ((sdf.parse(now)!!.time - sdf.parse(last)!!.time) / (1000 * 60 * 60 * 24)).toInt()
+            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+            if (days >= 2 || (days == 1 && hour >= 23)) clearFinishedItems(key, now)
+        } catch (e: Exception) {
+            showToast("❌ Date parsing error: ${e.message}")
+        }
+    }
 
-        toast.show()
+    private fun clearFinishedItems(key: String, date: String) {
+        listId?.let {
+            db.collection("shopping_lists").document(it)
+                .update("finishedItems", emptyList<String>())
+                .addOnSuccessListener {
+                    getSharedPreferences("SyncMartPrefs", MODE_PRIVATE).edit {
+                        putString(key, date)
+                    }
+                }
+                .addOnFailureListener { showToast("❌ Clearing error: ${it.message}") }
+        }
+    }
+
+    private fun showToast(msg: String) {
+        val layout = LayoutInflater.from(this).inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
+        layout.findViewById<TextView>(R.id.toast_text).text = msg
+        Toast(this).apply {
+            duration = Toast.LENGTH_LONG
+            setGravity(Gravity.CENTER, 0, 0)
+            view = layout
+            show()
+        }
+    }
+
+    fun enterSelectionMode() {
+        binding.toolbar.apply {
+            title = "Select Items"
+            menu.clear()
+            menu.add(Menu.NONE, menuDeleteId, Menu.NONE, "Delete").apply {
+                setIcon(android.R.drawable.ic_menu_delete)
+                setShowAsAction(MenuItem.SHOW_AS_ACTION_IF_ROOM)
+            }
+            setOnMenuItemClickListener {
+                if (it.itemId == menuDeleteId) {
+                    (supportFragmentManager.findFragmentByTag("f0") as? PendingItemsFragment)?.showConfirmDeleteDialog()
+                    true
+                } else false
+            }
+        }
+    }
+
+    fun updateSelectionCount(count: Int) {
+        binding.toolbar.title = "$count selected"
+    }
+
+    fun exitSelectionMode() {
+        binding.toolbar.menu.clear()
+        binding.toolbar.title = currentListName
+    }
+
+    private fun fallbackSetup() {
+        if (binding.toolbar.title == "Loading...") {
+            currentListName = "Shopping List"
+            binding.toolbar.title = currentListName
+        }
+        listId?.let { setupViewPager(it) }
     }
 }

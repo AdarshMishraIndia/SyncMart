@@ -5,7 +5,7 @@ data class ShoppingList(
     val listName: String = "",
     val accessEmails: List<String> = emptyList(),
     val owner: String = "",
-    val pendingItems: List<String> = emptyList(),
+    val pendingItems: Map<String, Boolean> = emptyMap(),
     val finishedItems: List<String> = emptyList(),
     var position: Int = 0
 )

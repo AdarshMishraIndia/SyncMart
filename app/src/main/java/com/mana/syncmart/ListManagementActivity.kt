@@ -339,8 +339,9 @@ class ListManagementActivity : AppCompatActivity() {
             .get()
             .addOnSuccessListener { snapshot ->
                 snapshot?.documents?.forEach { doc ->
-                    doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                        combinedLists[doc.id] = it
+                    val shoppingList = doc.toObject(ShoppingList::class.java)
+                    if (shoppingList != null) {
+                        combinedLists[doc.id] = shoppingList.copy(id = doc.id)
                     }
                 }
 
@@ -349,8 +350,9 @@ class ListManagementActivity : AppCompatActivity() {
                     .get()
                     .addOnSuccessListener { accessSnapshot ->
                         accessSnapshot?.documents?.forEach { doc ->
-                            doc.toObject(ShoppingList::class.java)?.copy(id = doc.id)?.let {
-                                combinedLists[doc.id] = it
+                            val shoppingList = doc.toObject(ShoppingList::class.java)
+                            if (shoppingList != null) {
+                                combinedLists[doc.id] = shoppingList.copy(id = doc.id)
                             }
                         }
 
@@ -370,8 +372,12 @@ class ListManagementActivity : AppCompatActivity() {
                                         when (change.type) {
                                             com.google.firebase.firestore.DocumentChange.Type.ADDED,
                                             com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
-                                                val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
-                                                combinedLists[docId] = list
+                                                try {
+                                                    val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
+                                                    combinedLists[docId] = list
+                                                } catch (e: Exception) {
+                                                    showCustomToast("❌ Failed to parse list: ${e.message}")
+                                                }
                                             }
                                             com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
                                                 combinedLists.remove(docId)
@@ -393,8 +399,12 @@ class ListManagementActivity : AppCompatActivity() {
                                         when (change.type) {
                                             com.google.firebase.firestore.DocumentChange.Type.ADDED,
                                             com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
-                                                val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
-                                                combinedLists[docId] = list
+                                                try {
+                                                    val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
+                                                    combinedLists[docId] = list
+                                                } catch (e: Exception) {
+                                                    showCustomToast("❌ Failed to parse list: ${e.message}")
+                                                }
                                             }
                                             com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
                                                 combinedLists.remove(docId)

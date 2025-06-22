@@ -8,17 +8,17 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.firebase.firestore.FirebaseFirestore
-import com.mana.syncmart.databinding.FragmentFinishedItemsBinding
 import com.google.firebase.firestore.ListenerRegistration
-
+import com.mana.syncmart.databinding.FragmentFinishedItemsBinding
 
 class FinishedItemsFragment : Fragment() {
 
     private lateinit var binding: FragmentFinishedItemsBinding
     private lateinit var db: FirebaseFirestore
     private lateinit var adapter: ItemAdapter
-    private var finishedItems = mutableListOf<String>()
+    private var finishedItems = mutableListOf<Pair<String, Boolean>>()  // Pair of (itemName, isImportant)
     private var listId: String? = null
+    private var finishedItemsListener: ListenerRegistration? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -31,7 +31,7 @@ class FinishedItemsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         db = FirebaseFirestore.getInstance()
-        listId = activity?.intent?.getStringExtra("LIST_ID")
+        listId = arguments?.getString("LIST_ID")
 
         setupRecyclerView()
         listId?.let { fetchFinishedItems(it) }
@@ -39,10 +39,10 @@ class FinishedItemsFragment : Fragment() {
 
     private fun setupRecyclerView() {
         adapter = ItemAdapter(
+            listId = listId ?: "",
             items = finishedItems,
-            onDeleteClicked = {},
-            onItemChecked = {},
-            showButtons = false
+            onItemChecked = {}, // No-op for finished items
+            showButtons = false,
         )
 
         binding.recyclerViewFinished.apply {
@@ -51,10 +51,8 @@ class FinishedItemsFragment : Fragment() {
         }
     }
 
-    private var finishedItemsListener: ListenerRegistration? = null
-
     private fun fetchFinishedItems(listId: String) {
-        finishedItemsListener?.remove() // Remove old listener if exists
+        finishedItemsListener?.remove()
 
         finishedItemsListener = db.collection("shopping_lists").document(listId)
             .addSnapshotListener { document, error ->
@@ -70,16 +68,19 @@ class FinishedItemsFragment : Fragment() {
             }
     }
 
-
-
     @SuppressLint("NotifyDataSetChanged")
     private fun updateItemList(newItems: List<String>) {
         finishedItems.clear()
-        finishedItems.addAll(newItems)
+        finishedItems.addAll(newItems.map { it to false }) // Default isImportant = false
         adapter.notifyDataSetChanged()
     }
 
     private fun showToast(message: String) {
         android.widget.Toast.makeText(requireContext(), message, android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        finishedItemsListener?.remove()
     }
 }
