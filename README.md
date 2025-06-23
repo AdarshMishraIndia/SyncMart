@@ -4,6 +4,14 @@
 
 ---
 
+## Demo
+
+[![SyncMart Intro Video](https://img.youtube.com/vi/_tKYWtTrEkY/0.jpg)](https://www.youtube.com/shorts/_tKYWtTrEkY)
+
+Watch a short walkthrough of how SyncMart works in real-time collaboration.
+
+---
+
 ## Key Features
 
 ### Core Functionality
