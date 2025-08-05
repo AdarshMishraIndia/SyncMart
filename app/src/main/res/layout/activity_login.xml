@@ -108,16 +108,17 @@
                 android:id="@+id/textView4"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/register_prompt"
-                android:textSize="16sp"
-                android:textColor="#03FA0E"
-                android:textStyle="bold"
                 android:paddingStart="4dp"
                 android:paddingEnd="4dp"
                 android:shadowColor="#000000"
                 android:shadowDx="2.5"
                 android:shadowDy="2.5"
-                android:shadowRadius="10" />
+                android:shadowRadius="10"
+                android:text="@string/register_prompt"
+                android:textColor="#03FA0E"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                tools:ignore="TextContrastCheck" />
         </LinearLayout>
 
     </androidx.constraintlayout.widget.ConstraintLayout>

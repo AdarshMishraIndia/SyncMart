@@ -2,7 +2,9 @@ package com.mana.syncmart
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
 import android.view.*
+import android.view.inputmethod.InputMethodManager
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -87,16 +89,18 @@ class ListActivity : AppCompatActivity() {
         val dialogBinding = DialogAddItemsBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        dialog.show()
+
 
         // Request focus and show keyboard
-        dialogBinding.editTextTextMultiLine.apply {
-            requestFocus()
-            post {
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-                imm.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-            }
+        dialog.setOnShowListener {
+            dialogBinding.editTextTextMultiLine.requestFocus()
+            Handler(mainLooper).postDelayed({
+                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.showSoftInput(dialogBinding.editTextTextMultiLine, InputMethodManager.SHOW_IMPLICIT)
+            }, 100)
         }
+
+        dialog.show()
 
         dialogBinding.btnSend.setOnClickListener {
             val items = dialogBinding.editTextTextMultiLine.text.toString()

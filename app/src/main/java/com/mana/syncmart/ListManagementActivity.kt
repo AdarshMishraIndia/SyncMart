@@ -225,7 +225,7 @@ class ListManagementActivity : AppCompatActivity() {
 
     private fun logoutUser() {
         auth.signOut()
-        startActivity(Intent(this, LoginActivity::class.java).apply {
+        startActivity(Intent(this, AuthActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         })
         finish()

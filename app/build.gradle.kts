@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -64,6 +66,8 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.material)
     implementation(libs.circleimageview)
+    implementation(libs.play.services.auth)
+    implementation(libs.google.identity)
 }
 
 repositories {

@@ -39,16 +39,16 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:padding="10dp"
+                        android:shadowColor="@color/black"
+                        android:shadowRadius="10"
                         android:text="SyncMart"
                         android:textColor="@android:color/white"
-                        android:textSize="20sp"
+                        android:textSize="20dp"
                         android:textStyle="bold"
-                        android:shadowRadius="10"
-                        android:shadowColor="@color/black"
                         app:layout_constraintBottom_toBottomOf="parent"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent"
-                        tools:ignore="HardcodedText" />
+                        tools:ignore="HardcodedText,SpUsage,TextSizeCheck" />
 
                     <!-- Welcome Text -->
                     <TextView
@@ -56,15 +56,15 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:padding="5dp"
+                        android:shadowColor="@color/black"
+                        android:shadowRadius="10"
                         android:text="Welcome, (UserName)"
                         android:textColor="#FFFF00"
-                        android:shadowRadius="10"
-                        android:shadowColor="@color/black"
-                        android:textSize="16sp"
+                        android:textSize="16dp"
                         android:textStyle="bold"
-                        app:layout_constraintEnd_toEndOf="parent"
                         app:layout_constraintBottom_toBottomOf="parent"
-                        tools:ignore="HardcodedText" />
+                        app:layout_constraintEnd_toEndOf="parent"
+                        tools:ignore="HardcodedText,SpUsage,TextSizeCheck" />
 
                 </androidx.constraintlayout.widget.ConstraintLayout>
 

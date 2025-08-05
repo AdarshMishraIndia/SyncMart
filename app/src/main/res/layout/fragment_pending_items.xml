@@ -6,17 +6,6 @@
     android:orientation="vertical"
     android:padding="10dp">
 
-    <!-- Status Label -->
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/pending_items"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:gravity="center"
-        android:padding="8dp" />
-
     <!-- RecyclerView for Pending Items -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerViewPending"

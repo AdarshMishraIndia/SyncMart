@@ -10,6 +10,8 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.firebase.firestore.FieldPath
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.DialogConfirmBinding
@@ -105,9 +107,9 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         listId?.let { id ->
             val docRef = db.collection("shopping_lists").document(id)
 
-            docRef.update("pendingItems.$itemName", com.google.firebase.firestore.FieldValue.delete())
+            docRef.update(FieldPath.of("pendingItems", itemName), FieldValue.delete())
                 .addOnSuccessListener {
-                    docRef.update("finishedItems", com.google.firebase.firestore.FieldValue.arrayUnion(itemName))
+                    docRef.update("finishedItems", FieldValue.arrayUnion(itemName))
                         .addOnFailureListener {
                             showToast("Failed to move item to finished")
                         }
@@ -170,7 +172,7 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         val listRef = db.collection("shopping_lists").document(listId!!)
 
         for (item in selectedItems) {
-            batch.update(listRef, "pendingItems.$item", com.google.firebase.firestore.FieldValue.delete())
+            batch.update(listRef, "pendingItems.$item", FieldValue.delete())
         }
 
         batch.commit()

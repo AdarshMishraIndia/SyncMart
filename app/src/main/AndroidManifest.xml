@@ -21,16 +21,19 @@
             android:theme="@style/Theme.SyncMart.Splash"
             android:launchMode="singleTask"
             android:noHistory="true">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+
         </activity>
 
         <activity
             android:name=".LoginActivity"
-            android:exported="false"
+            android:exported="true"
             android:theme="@style/Theme.SyncMart"
             android:launchMode="singleTask"
             android:noHistory="true">
@@ -42,6 +45,7 @@
             android:theme="@style/Theme.SyncMart"
             android:launchMode="singleTask"
             android:noHistory="true">
+
         </activity>
 
         <activity
@@ -61,6 +65,13 @@
             android:exported="false"
             android:theme="@style/Theme.SyncMart">
         </activity>
+
+        <activity
+            android:name=".AuthActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SyncMart">
+        </activity>
+
 
     </application>
 

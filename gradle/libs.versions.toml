@@ -1,20 +1,24 @@
 [versions]
 agp = "8.9.3"
-firebaseBom = "33.14.0"
+firebaseBom = "33.16.0"
 kotlin = "2.0.0"
 coreKtx = "1.16.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
-lifecycleRuntimeKtx = "2.9.0"
+lifecycleRuntimeKtx = "2.9.1"
 activityCompose = "1.10.1"
-composeBom = "2025.05.01"
-googleGmsGoogleServices = "4.4.2"
+composeBom = "2025.06.01"
+googleGmsGoogleServices = "4.4.3"
 firebaseAuth = "23.2.1"
 androidx-constraintlayout = "2.2.1"
 material = "1.12.0"
 firebaseFirestore = "25.1.4"
 circleimageview = "3.1.0"
+credentials = "1.5.0"
+credentialsPlayServicesAuth = "1.5.0"
+googleid = "1.1.1"
+play-services-auth = "21.3.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -37,6 +41,10 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 androidx-material = { module = "com.google.android.material:material", version.ref = "material" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore", version.ref = "firebaseFirestore" }
 circleimageview = { module = "de.hdodenhof:circleimageview", version.ref = "circleimageview" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
+google-identity = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

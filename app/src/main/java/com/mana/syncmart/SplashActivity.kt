@@ -13,19 +13,13 @@ class SplashActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_splash) // Set the splash screen layout
+        setContentView(R.layout.activity_splash)
 
-        // Delay the transition to LoginActivity or ListManagementActivity
         Handler(Looper.getMainLooper()).postDelayed({
-            val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-            val nextActivity = if (auth.currentUser != null) {
-                ListManagementActivity::class.java // User logged in
-            } else {
-                RegisterActivity::class.java // User not logged in
-            }
+            val nextActivity = AuthActivity::class.java
             startActivity(Intent(this, nextActivity))
             overridePendingTransition(R.anim.splash_fade_in, R.anim.splash_fade_out)
             finish()
-        }, 1000) // 2-second delay
+        }, 1000) // 1-second delay
     }
 }
