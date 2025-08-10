@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.circleimageview)
     implementation(libs.play.services.auth)
     implementation(libs.google.identity)
+    implementation(libs.lottie)
 }
 
 repositories {

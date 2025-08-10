@@ -2,6 +2,8 @@ package com.mana.syncmart
 
 import android.app.AlertDialog
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +12,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,6 +28,7 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
     private lateinit var adapter: ItemAdapter
     private var listId: String? = null
     private var firestoreListener: ListenerRegistration? = null
+    private val scrollHandler = Handler(Looper.getMainLooper())
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -58,6 +62,19 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
                 adapter.clearSelection()
             }
         }
+
+        // Arrow click listeners
+        binding.upArrowAnimation.setOnClickListener {
+            binding.recyclerViewPending.smoothScrollToPosition(0)
+            hideArrows()
+            postEvaluateArrows()
+        }
+
+        binding.downArrowAnimation.setOnClickListener {
+            binding.recyclerViewPending.smoothScrollToPosition(adapter.itemCount - 1)
+            hideArrows()
+            postEvaluateArrows()
+        }
     }
 
     private fun setupRecyclerView() {
@@ -69,10 +86,52 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
             selectionListener = this
         )
 
-        binding.recyclerViewPending.apply {
-            layoutManager = LinearLayoutManager(requireContext())
-            adapter = this@PendingItemsFragment.adapter
+        val recyclerView = binding.recyclerViewPending
+        recyclerView.layoutManager = LinearLayoutManager(requireContext())
+        recyclerView.adapter = adapter
+
+        // Initial arrow evaluation
+        recyclerView.viewTreeObserver.addOnGlobalLayoutListener {
+            evaluateArrowsVisibility()
         }
+
+        recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+                hideArrows() // Hide while scrolling
+            }
+
+            override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                    postEvaluateArrows()
+                }
+            }
+        })
+    }
+
+    private fun postEvaluateArrows() {
+        scrollHandler.postDelayed({
+            evaluateArrowsVisibility()
+        }, 200)
+    }
+
+    private fun evaluateArrowsVisibility() {
+        val recyclerView = binding.recyclerViewPending
+        val layoutManager = recyclerView.layoutManager as? LinearLayoutManager ?: return
+
+        val firstVisible = layoutManager.findFirstCompletelyVisibleItemPosition()
+        val lastVisible = layoutManager.findLastCompletelyVisibleItemPosition()
+        val totalItems = adapter.itemCount
+
+        val showUp = firstVisible > 0
+        val showDown = lastVisible < totalItems - 1 && totalItems > 0
+
+        binding.upArrowAnimation.visibility = if (showUp) View.VISIBLE else View.GONE
+        binding.downArrowAnimation.visibility = if (showDown) View.VISIBLE else View.GONE
+    }
+
+    private fun hideArrows() {
+        binding.upArrowAnimation.visibility = View.GONE
+        binding.downArrowAnimation.visibility = View.GONE
     }
 
     private fun startFirestoreListener(id: String) {
@@ -99,6 +158,7 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
                     }.toMap()
 
                     adapter.updateList(parsedMap)
+                    evaluateArrowsVisibility()
                 }
             }
     }
@@ -164,7 +224,6 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         }
 
         dialog.show()
-
     }
 
     private fun deleteSelectedItems(selectedItems: List<String>) {
@@ -184,5 +243,4 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
                 showToast("Failed to delete items")
             }
     }
-
 }

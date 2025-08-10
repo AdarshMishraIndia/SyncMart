@@ -1,17 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/pending_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:padding="10dp">
 
-    <!-- RecyclerView for Pending Items -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recyclerViewPending"
+    <!-- RecyclerView with Border Wrapper -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scrollbars="vertical"
-        tools:ignore="SpeakableTextPresentCheck" />
+        android:background="@drawable/recycler_border">
 
-</LinearLayout>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recyclerViewPending"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="vertical"
+            tools:ignore="SpeakableTextPresentCheck" />
+    </FrameLayout>
+
+    <!-- Lottie Arrow (Visible only when list is scrollable) -->
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/downArrowAnimation"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:rotation="0"
+        android:layout_marginBottom="10dp"
+        android:visibility="visible"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"
+        app:lottie_fileName="extraItemsDownArrowRecycler.json" />
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/upArrowAnimation"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_gravity="top|center_horizontal"
+        android:rotation="180"
+        android:layout_marginBottom="10dp"
+        android:visibility="visible"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"
+        app:lottie_fileName="extraItemsDownArrowRecycler.json" />
+</FrameLayout>
