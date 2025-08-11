@@ -39,10 +39,11 @@
         android:layout_width="100dp"
         android:layout_height="100dp"
         android:layout_gravity="top|center_horizontal"
-        android:rotation="180"
         android:layout_marginBottom="10dp"
+        android:rotation="180"
         android:visibility="visible"
         app:lottie_autoPlay="true"
+        app:lottie_fileName="extraItemsDownArrowRecycler.json"
         app:lottie_loop="true"
-        app:lottie_fileName="extraItemsDownArrowRecycler.json" />
+        tools:ignore="ImageContrastCheck" />
 </FrameLayout>

@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
@@ -31,17 +30,36 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.SocketTimeoutException
 import java.io.IOException
+import com.airbnb.lottie.LottieAnimationView
+import android.view.WindowManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import com.google.android.material.snackbar.Snackbar
+import android.view.Gravity
+import android.widget.FrameLayout
 
 @Suppress("UNCHECKED_CAST", "DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityListManagementBinding
+
     private lateinit var db: FirebaseFirestore
     private lateinit var auth: FirebaseAuth
     private lateinit var listAdapter: ListAdapter
+
     private val shoppingLists = mutableMapOf<String, ShoppingList>()
     private val realTimeListeners = mutableListOf<ListenerRegistration>()
     private var userName: String = "User"
+
+    private var loadingDialog: AlertDialog? = null
+
+    private val isConnectedFlow = MutableStateFlow(false)
+    private var noInternetSnackbar: Snackbar? = null
+
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,32 +80,68 @@ class ListManagementActivity : AppCompatActivity() {
         setupDragAndDrop()
         setupNavigationDrawer()
         fetchUserName()
-        fetchShoppingLists()
 
+        binding.addListButton.setOnClickListener { showModifyDialog(false) }
 
-
-        binding.addListButton.setOnClickListener {
-            showModifyDialog(isEditing = false)
-        }
-
-        var isRequestInProgress = false
+        setupInternetMonitoring()
 
         binding.textViewSendWapp.setOnClickListener {
-            if (!isRequestInProgress) {
-                isRequestInProgress = true
+            if (!it.isActivated) { // simple flag on view to throttle
+                it.isActivated = true
+                binding.textViewSendWapp.background = ContextCompat.getDrawable(this, R.drawable.red_pink_bg)
+                sendWhatsAppNotification { success ->
+                    it.isActivated = false
+                    binding.textViewSendWapp.setBackgroundResource(R.drawable.green_blue_bg)
+                }
+            }
+        }
+    }
 
-                // Set progress background (red_pink_bg)
-                binding.textViewSendWapp.background =
-                    ContextCompat.getDrawable(this, R.drawable.red_pink_bg)
-
-                sendWhatsAppNotification(success = { wasSuccessful ->
-                    isRequestInProgress = false
-
-                    binding.textViewSendWapp.setBackgroundResource(R.drawable.green_blue_bg )
-                })
+    private fun setupInternetMonitoring() {
+        scope.launch {
+            while (isActive) {
+                val connected = isInternetAvailable()
+                isConnectedFlow.value = connected
+                delay(1500)
             }
         }
 
+        scope.launch {
+            isConnectedFlow.collectLatest { connected ->
+                if (connected) {
+                    dismissNoInternetSnackbar()
+                    binding.recyclerView.visibility = View.VISIBLE
+                    binding.emptyStateText.visibility = View.GONE
+                    fetchShoppingLists()
+                } else {
+                    binding.recyclerView.visibility = View.GONE
+                    showNoInternetSnackbar()
+                }
+            }
+        }
+    }
+
+    private fun showNoInternetSnackbar() {
+        if (noInternetSnackbar == null) {
+            noInternetSnackbar = Snackbar.make(binding.root, "⚠️ No internet connection 📡", Snackbar.LENGTH_INDEFINITE)
+            val snackbarView = noInternetSnackbar!!.view
+            val params = snackbarView.layoutParams as FrameLayout.LayoutParams
+            params.gravity = Gravity.CENTER
+            snackbarView.layoutParams = params
+        }
+        noInternetSnackbar?.show()
+    }
+
+    private fun dismissNoInternetSnackbar() {
+        noInternetSnackbar?.dismiss()
+    }
+
+    private fun isInternetAvailable(): Boolean {
+        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+        val activeNetwork = cm.activeNetwork ?: return false
+        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun setupNavigationDrawer() {
@@ -320,6 +374,7 @@ class ListManagementActivity : AppCompatActivity() {
     }
 
     private fun fetchShoppingLists() {
+        showLoadingDialog()
         val userEmail = auth.currentUser?.email ?: return
         val combinedLists = mutableMapOf<String, ShoppingList>()
 
@@ -400,27 +455,33 @@ class ListManagementActivity : AppCompatActivity() {
                                             com.google.firebase.firestore.DocumentChange.Type.ADDED,
                                             com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
                                                 try {
-                                                    val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
+                                                    val list =
+                                                        change.document.toObject(ShoppingList::class.java)
+                                                            .copy(id = docId)
                                                     combinedLists[docId] = list
                                                 } catch (e: Exception) {
                                                     showCustomToast("❌ Failed to parse list: ${e.message}")
                                                 }
                                             }
+
                                             com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
                                                 combinedLists.remove(docId)
                                             }
                                         }
                                     }
                                     updateUI()
+                                    hideLoadingDialog()
                                 }
                         )
 
                     }
                     .addOnFailureListener {
+                        hideLoadingDialog()
                         showCustomToast("Failed to fetch lists with access")
                     }
             }
             .addOnFailureListener {
+                hideLoadingDialog()
                 showCustomToast("Failed to fetch shopping lists")
             }
     }
@@ -538,10 +599,10 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-
-
     override fun onDestroy() {
         realTimeListeners.forEach { it.remove() }
+        noInternetSnackbar?.dismiss()
+        scope.cancel()
         super.onDestroy()
     }
 
@@ -563,6 +624,30 @@ class ListManagementActivity : AppCompatActivity() {
             override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
         }
         ItemTouchHelper(callback).attachToRecyclerView(binding.recyclerView)
+    }
+
+    private fun showLoadingDialog() {
+        if (loadingDialog?.isShowing == true) return
+
+        val dialogView = LayoutInflater.from(this).inflate(R.layout.layout_loading, null)
+        val animationView = dialogView.findViewById<LottieAnimationView>(R.id.loading_animation)
+        animationView.playAnimation()
+
+        loadingDialog = AlertDialog.Builder(this)
+            .setView(dialogView)
+            .setCancelable(false)
+            .create()
+
+        loadingDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        loadingDialog?.show()
+
+        val widthPx = resources.getDimensionPixelSize(R.dimen.loading_dialog_width)
+        loadingDialog?.window?.setLayout(widthPx, WindowManager.LayoutParams.WRAP_CONTENT)
+    }
+
+    private fun hideLoadingDialog() {
+        loadingDialog?.dismiss()
+        loadingDialog = null
     }
 
     @Suppress("DEPRECATION")
