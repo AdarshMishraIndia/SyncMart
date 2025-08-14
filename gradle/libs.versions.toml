@@ -1,6 +1,6 @@
 [versions]
 agp = "8.9.3"
-firebaseBom = "34.0.0"
+firebaseBom = "34.1.0"
 kotlin = "2.0.0"
 coreKtx = "1.16.0"
 junit = "4.13.2"
@@ -10,7 +10,7 @@ lifecycleRuntimeKtx = "2.9.2"
 activityCompose = "1.10.1"
 composeBom = "2025.07.00"
 googleGmsGoogleServices = "4.4.3"
-firebaseAuth = "24.0.0"
+firebaseAuth = "24.0.1"
 androidx-constraintlayout = "2.2.1"
 material = "1.12.0"
 firebaseFirestore = "26.0.0"
@@ -20,6 +20,9 @@ credentialsPlayServicesAuth = "1.5.0"
 googleid = "1.1.1"
 play-services-auth = "21.4.0"
 lottie = "6.4.0"
+lifecycleViewmodelKtx = "2.9.2"
+lifecycleLivedataKtx = "2.9.2"
+coroutinesAndroid = "1.9.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -47,6 +50,9 @@ androidx-credentials-play-services-auth = { group = "androidx.credentials", name
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
 google-identity = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 lottie = { group = "com.airbnb.android", name = "lottie", version.ref = "lottie" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
+androidx-lifecycle-livedata-ktx = { group = "androidx.lifecycle", name = "lifecycle-livedata-ktx", version.ref = "lifecycleLivedataKtx" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutinesAndroid" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

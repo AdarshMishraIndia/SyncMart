@@ -4,70 +4,43 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.airbnb.lottie.LottieAnimationView
+import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.ActivityListManagementBinding
 import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.DialogModifyListBinding
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.SocketTimeoutException
-import java.io.IOException
-import com.airbnb.lottie.LottieAnimationView
-import android.view.WindowManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import com.google.android.material.snackbar.Snackbar
-import android.view.Gravity
 import android.widget.FrameLayout
+import android.view.WindowManager
 
-@Suppress("UNCHECKED_CAST", "DEPRECATION")
+@Suppress("DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityListManagementBinding
-
-    private lateinit var db: FirebaseFirestore
-    private lateinit var auth: FirebaseAuth
     private lateinit var listAdapter: ListAdapter
-
-    private val shoppingLists = mutableMapOf<String, ShoppingList>()
-    private val realTimeListeners = mutableListOf<ListenerRegistration>()
-    private var userName: String = "User"
-
     private var loadingDialog: AlertDialog? = null
-
-    private val isConnectedFlow = MutableStateFlow(false)
     private var noInternetSnackbar: Snackbar? = null
-
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val viewModel: ListManagementViewModel by viewModels { ListManagementViewModelFactory(application) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityListManagementBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        db = FirebaseFirestore.getInstance()
-        auth = FirebaseAuth.getInstance()
 
         setSupportActionBar(binding.toolbar)
         supportActionBar?.apply {
@@ -79,17 +52,15 @@ class ListManagementActivity : AppCompatActivity() {
         setupRecyclerView()
         setupDragAndDrop()
         setupNavigationDrawer()
-        fetchUserName()
+        setupObservers()
 
         binding.addListButton.setOnClickListener { showModifyDialog(false) }
 
-        setupInternetMonitoring()
-
         binding.textViewSendWapp.setOnClickListener {
-            if (!it.isActivated) { // simple flag on view to throttle
+            if (!it.isActivated) {
                 it.isActivated = true
                 binding.textViewSendWapp.background = ContextCompat.getDrawable(this, R.drawable.red_pink_bg)
-                sendWhatsAppNotification { success ->
+                viewModel.sendWhatsAppNotification { success ->
                     it.isActivated = false
                     binding.textViewSendWapp.setBackgroundResource(R.drawable.green_blue_bg)
                 }
@@ -97,27 +68,35 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupInternetMonitoring() {
-        scope.launch {
-            while (isActive) {
-                val connected = isInternetAvailable()
-                isConnectedFlow.value = connected
-                delay(1500)
+    @SuppressLint("SetTextI18n")
+    private fun setupObservers() {
+        viewModel.uiState.observe(this) { state ->
+            binding.toolbarUser.text = "Welcome, ${state.userName}"
+            listAdapter.updateListPreserveSelection(state.shoppingLists.toMutableList())
+            binding.recyclerView.visibility = if (state.isConnected && state.shoppingLists.isNotEmpty()) View.VISIBLE else View.GONE
+            binding.emptyStateText.visibility = if (!state.isLoading && state.isConnected && state.shoppingLists.isEmpty()) View.VISIBLE else View.GONE
+            if (state.isLoading) showLoadingDialog() else hideLoadingDialog()
+            if (!state.isConnected) showNoInternetSnackbar() else dismissNoInternetSnackbar()
+            if (state.navigateToAuth) {
+                startActivity(Intent(this, AuthActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                })
+                finish()
+                viewModel.resetNavigateToAuth()
+            }
+            if (state.navigateToFriendActivity) {
+                startActivity(Intent(this, FriendActivity::class.java))
+                viewModel.resetNavigateToFriendActivity()
+            }
+            if (state.navigateToRegister) {
+                val intent = Intent(this, RegisterActivity::class.java)
+                intent.putExtra("isEditingProfile", true)
+                startActivity(intent)
+                viewModel.resetNavigateToRegister()
             }
         }
-
-        scope.launch {
-            isConnectedFlow.collectLatest { connected ->
-                if (connected) {
-                    dismissNoInternetSnackbar()
-                    binding.recyclerView.visibility = View.VISIBLE
-                    binding.emptyStateText.visibility = View.GONE
-                    fetchShoppingLists()
-                } else {
-                    binding.recyclerView.visibility = View.GONE
-                    showNoInternetSnackbar()
-                }
-            }
+        viewModel.toastMessage.observe(this) { message ->
+            if (message != null) showCustomToast(message)
         }
     }
 
@@ -136,14 +115,6 @@ class ListManagementActivity : AppCompatActivity() {
         noInternetSnackbar?.dismiss()
     }
 
-    private fun isInternetAvailable(): Boolean {
-        val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        val activeNetwork = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                && capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
-
     private fun setupNavigationDrawer() {
         val drawerLayout = binding.drawerLayout
         val navView = binding.navigationView
@@ -160,12 +131,12 @@ class ListManagementActivity : AppCompatActivity() {
             when (menuItem.itemId) {
                 R.id.nav_friends_and_lists -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    startActivity(Intent(this, FriendActivity::class.java))
+                    viewModel.navigateToFriendActivity()
                     true
                 }
                 R.id.nav_logout -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    logoutUser()
+                    viewModel.logout()
                     true
                 }
                 R.id.nav_delete_account -> {
@@ -175,9 +146,7 @@ class ListManagementActivity : AppCompatActivity() {
                 }
                 R.id.nav_edit_profile -> {
                     drawerLayout.closeDrawer(GravityCompat.START)
-                    val intent = Intent(this, RegisterActivity::class.java)
-                    intent.putExtra("isEditingProfile", true)
-                    startActivity(intent)
+                    viewModel.navigateToEditProfile()
                     true
                 }
                 else -> false
@@ -195,94 +164,9 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
         dialogBinding.btnDelete.setOnClickListener {
             dialog.dismiss()
-            deleteAccount()
+            viewModel.deleteAccount()
         }
-
         dialog.show()
-    }
-
-    private fun deleteAccount() {
-        val user = auth.currentUser ?: return
-        val userEmail = user.email ?: return
-
-        showCustomToast("Deleting account...")
-
-        // Step 1: Delete Firestore user document
-        db.collection("Users").document(userEmail).delete()
-            .addOnSuccessListener {
-                // Step 2: Delete Firebase auth user
-                user.delete()
-                    .addOnSuccessListener {
-                        showCustomToast("✅ Account deleted successfully")
-                        startActivity(Intent(this, RegisterActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        })
-                        finish()
-                    }
-                    .addOnFailureListener {
-                        showCustomToast("❌ Failed to delete authentication account. Please re-authenticate.")
-                    }
-            }
-            .addOnFailureListener {
-                showCustomToast("❌ Failed to delete Firestore account.")
-            }
-    }
-
-    private fun fetchUserName() {
-        val userEmail = auth.currentUser?.email ?: return
-
-        db.collection("Users").document(userEmail).get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    userName = document.getString("name")?.split(" ")?.firstOrNull()?.trim() ?: "User"
-                    updateToolbarTitle()
-                }
-            }
-            .addOnFailureListener {
-                showCustomToast("Failed to fetch user profile")
-            }
-    }
-
-    @SuppressLint("SetTextI18n")
-    private fun updateToolbarTitle() {
-        val selectedCount = listAdapter.getSelectedItems().size
-        if (selectedCount > 0) {
-            binding.toolbarTitle.visibility = View.GONE
-            binding.toolbarUser.visibility = View.GONE
-            binding.toolbar.title = "$selectedCount Selected"
-        } else {
-            binding.toolbarTitle.visibility = View.VISIBLE
-            binding.toolbarUser.visibility = View.VISIBLE
-            binding.toolbarUser.text = "Welcome, $userName"
-        }
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean = true
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            android.R.id.home -> {
-                binding.drawerLayout.openDrawer(GravityCompat.START)
-                true
-            }
-            R.id.action_delete_selection -> {
-                confirmDeleteSelectedItems()
-                true
-            }
-            R.id.action_edit_selection -> {
-                editSelectedItem()
-                true
-            }
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
-    private fun logoutUser() {
-        auth.signOut()
-        startActivity(Intent(this, AuthActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
-        finish()
     }
 
     private fun setupRecyclerView() {
@@ -308,8 +192,8 @@ class ListManagementActivity : AppCompatActivity() {
             binding.toolbar.menu.clear()
             binding.toolbar.inflateMenu(R.menu.selection_menu)
 
-            val userEmail = auth.currentUser?.email ?: return
-            val allOwned = listAdapter.getSelectedItems().all { shoppingLists[it]?.owner == userEmail }
+            val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: return
+            val allOwned = listAdapter.getSelectedItems().all { viewModel.uiState.value?.shoppingLists?.find { sl -> sl.id == it }?.owner == userEmail }
 
             binding.toolbar.menu.findItem(R.id.action_delete_selection)?.isVisible = allOwned
             binding.toolbar.menu.findItem(R.id.action_edit_selection)?.isVisible = allOwned && selectedCount == 1
@@ -322,170 +206,6 @@ class ListManagementActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("SetTextI18n")
-    private fun confirmDeleteSelectedItems() {
-        val selectedIds = listAdapter.getSelectedItems()
-        if (selectedIds.isEmpty()) return
-
-        val dialogBinding = DialogConfirmBinding.inflate(LayoutInflater.from(this))
-        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
-        dialogBinding.listName.text = "Delete ${selectedIds.size} selected lists?"
-        dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
-        dialogBinding.btnDelete.setOnClickListener {
-            deleteSelectedItems(selectedIds)
-            dialog.dismiss()
-        }
-
-        dialog.show()
-    }
-
-    private fun deleteSelectedItems(selectedIds: List<String>) {
-        val batch = db.batch()
-        selectedIds.forEach { docId ->
-            val docRef = db.collection("shopping_lists").document(docId)
-            batch.delete(docRef)
-        }
-
-        batch.commit()
-            .addOnSuccessListener {
-                selectedIds.forEach { docId -> shoppingLists.remove(docId) }
-                val updatedList = shoppingLists.values.sortedBy { it.position }
-                listAdapter.updateListPreserveSelection(updatedList)
-                binding.emptyStateText.visibility = if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
-                listAdapter.clearSelection()
-                toggleSelectionMode(false)
-                fetchShoppingLists()
-            }
-            .addOnFailureListener {
-                showCustomToast("Failed to delete lists")
-            }
-    }
-
-    private fun editSelectedItem() {
-        val selectedId = listAdapter.getSelectedItems().singleOrNull() ?: return
-        shoppingLists[selectedId]?.let { showModifyDialog(true, it) }
-    }
-
-    private fun isListContentEqual(newList: List<ShoppingList>, currentList: List<ShoppingList>): Boolean {
-        if (newList.size != currentList.size) return false
-        return newList.zip(currentList).all { (newItem, currentItem) -> newItem == currentItem }
-    }
-
-    private fun fetchShoppingLists() {
-        showLoadingDialog()
-        val userEmail = auth.currentUser?.email ?: return
-        val combinedLists = mutableMapOf<String, ShoppingList>()
-
-        fun updateUI() {
-            val newSorted = combinedLists.values.sortedBy { it.position }
-            if (!isListContentEqual(newSorted, listAdapter.currentList)) {
-                shoppingLists.clear()
-                newSorted.forEach { shoppingLists[it.id] = it }
-                listAdapter.updateListPreserveSelection(newSorted.toMutableList())
-                toggleSelectionMode(false)
-                binding.emptyStateText.visibility = if (shoppingLists.isEmpty()) View.VISIBLE else View.GONE
-            }
-        }
-
-        db.collection("shopping_lists")
-            .whereEqualTo("owner", userEmail)
-            .get()
-            .addOnSuccessListener { snapshot ->
-                snapshot?.documents?.forEach { doc ->
-                    val shoppingList = doc.toObject(ShoppingList::class.java)
-                    if (shoppingList != null) {
-                        combinedLists[doc.id] = shoppingList.copy(id = doc.id)
-                    }
-                }
-
-                db.collection("shopping_lists")
-                    .whereArrayContains("accessEmails", userEmail)
-                    .get()
-                    .addOnSuccessListener { accessSnapshot ->
-                        accessSnapshot?.documents?.forEach { doc ->
-                            val shoppingList = doc.toObject(ShoppingList::class.java)
-                            if (shoppingList != null) {
-                                combinedLists[doc.id] = shoppingList.copy(id = doc.id)
-                            }
-                        }
-
-                        updateUI()
-
-                        realTimeListeners.forEach { it.remove() }
-                        realTimeListeners.clear()
-
-                        realTimeListeners.add(
-                            db.collection("shopping_lists")
-                                .whereEqualTo("owner", userEmail)
-                                .addSnapshotListener { snapshot, _ ->
-                                    if (snapshot == null) return@addSnapshotListener
-
-                                    for (change in snapshot.documentChanges) {
-                                        val docId = change.document.id
-                                        when (change.type) {
-                                            com.google.firebase.firestore.DocumentChange.Type.ADDED,
-                                            com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
-                                                try {
-                                                    val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
-                                                    combinedLists[docId] = list
-                                                } catch (e: Exception) {
-                                                    showCustomToast("❌ Failed to parse list: ${e.message}")
-                                                }
-                                            }
-                                            com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
-                                                combinedLists.remove(docId)
-                                            }
-                                        }
-                                    }
-                                    updateUI()
-                                }
-                        )
-
-                        realTimeListeners.add(
-                            db.collection("shopping_lists")
-                                .whereArrayContains("accessEmails", userEmail)
-                                .addSnapshotListener { snapshot, _ ->
-                                    if (snapshot == null) return@addSnapshotListener
-
-                                    for (change in snapshot.documentChanges) {
-                                        val docId = change.document.id
-                                        when (change.type) {
-                                            com.google.firebase.firestore.DocumentChange.Type.ADDED,
-                                            com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
-                                                try {
-                                                    val list =
-                                                        change.document.toObject(ShoppingList::class.java)
-                                                            .copy(id = docId)
-                                                    combinedLists[docId] = list
-                                                } catch (e: Exception) {
-                                                    showCustomToast("❌ Failed to parse list: ${e.message}")
-                                                }
-                                            }
-
-                                            com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
-                                                combinedLists.remove(docId)
-                                            }
-                                        }
-                                    }
-                                    updateUI()
-                                    hideLoadingDialog()
-                                }
-                        )
-
-                    }
-                    .addOnFailureListener {
-                        hideLoadingDialog()
-                        showCustomToast("Failed to fetch lists with access")
-                    }
-            }
-            .addOnFailureListener {
-                hideLoadingDialog()
-                showCustomToast("Failed to fetch shopping lists")
-            }
-    }
-
     private fun showModifyDialog(isEditing: Boolean, existingList: ShoppingList? = null) {
         val dialogBinding = DialogModifyListBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
@@ -495,19 +215,16 @@ class ListManagementActivity : AppCompatActivity() {
         val selectedEmails = existingList?.accessEmails?.toMutableSet() ?: mutableSetOf()
         dialogBinding.editTextListName.setText(existingList?.listName ?: "")
 
-        val userEmail = auth.currentUser?.email ?: return
-
-        db.collection("Users").document(userEmail).addSnapshotListener { snapshot, _ ->
+        val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: return
+        FirebaseFirestore.getInstance().collection("Users").document(userEmail).addSnapshotListener { snapshot, _ ->
             if (snapshot == null || !snapshot.exists()) {
                 toggleNoFriendsMessage(dialogBinding, true)
                 return@addSnapshotListener
             }
-
             val rawMap = snapshot.get("friendsMap") as? Map<*, *> ?: emptyMap<String, String>()
             val validMap = rawMap.entries.mapNotNull {
                 (it.key as? String)?.let { k -> (it.value as? String)?.let { v -> k to v } }
             }.toMap()
-
             updateFriendsUI(dialogBinding, validMap, selectedEmails)
         }
 
@@ -515,20 +232,18 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.btnCreate.setOnClickListener {
             val name = dialogBinding.editTextListName.text.toString().trim()
             if (name.isEmpty()) return@setOnClickListener
-            if (isEditing) existingList?.id?.let { updateExistingList(it, name, selectedEmails.toList()) }
-            else createNewList(name, selectedEmails.toList())
+            if (isEditing) existingList?.id?.let { viewModel.updateExistingList(it, name, selectedEmails.toList()) }
+            else viewModel.createNewList(name, selectedEmails.toList())
             dialog.dismiss()
         }
     }
 
     private fun updateFriendsUI(dialogBinding: DialogModifyListBinding, friendsMap: Map<String, String>, selectedEmails: MutableSet<String>) {
         toggleNoFriendsMessage(dialogBinding, friendsMap.isEmpty())
-
         val friendsList = friendsMap.map { Friend(it.value, it.key) }
         val adapter = FriendSelectionAdapter(this, friendsList, selectedEmails, { friend, isChecked ->
             if (isChecked) selectedEmails.add(friend.email) else selectedEmails.remove(friend.email)
         }, showCheckBox = true)
-
         dialogBinding.listViewMembers.adapter = adapter
         adapter.notifyDataSetChanged()
     }
@@ -538,80 +253,45 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.listViewMembers.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
-    private fun createNewList(listName: String, accessEmails: List<String>) {
-        val userEmail = auth.currentUser?.email ?: return
-        val newList = mapOf("listName" to listName, "owner" to userEmail, "accessEmails" to accessEmails)
-        db.collection("shopping_lists").add(newList).addOnFailureListener {
-            showCustomToast("Failed to create list")
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = true
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                binding.drawerLayout.openDrawer(GravityCompat.START)
+                true
+            }
+            R.id.action_delete_selection -> {
+                confirmDeleteSelectedItems()
+                true
+            }
+            R.id.action_edit_selection -> {
+                editSelectedItem()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun updateExistingList(listId: String, name: String, accessEmails: List<String>) {
-        val updates = mapOf("listName" to name, "accessEmails" to accessEmails)
-        db.collection("shopping_lists").document(listId).update(updates)
-            .addOnSuccessListener {
-                listAdapter.clearSelection()
-                toggleSelectionMode(false)
-            }
-            .addOnFailureListener {
-                showCustomToast("Failed to update list")
-            }
-    }
-
-    private fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
-        val apiUrl = "https://bhashsms.com/api/sendmsg.php?" +
-                "user=Urban_BW&pass=ucbl123&sender=BUZWAP&" +
-                "phone=9040292104&text=dddd&priority=wa&stype=normal"
-
-        CoroutineScope(Dispatchers.IO).launch {
-            var wasSuccessful = false
-
-            try {
-                withContext(Dispatchers.Main) {
-                    showCustomToast("📨 Sending Notification...")
-                }
-
-                val url = URL(apiUrl)
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "GET"
-                conn.connectTimeout = 3000  // Short timeout
-                conn.readTimeout = 3000
-
-                // "Fire" the request by opening the connection and immediately closing
-                conn.inputStream.close()
-                wasSuccessful = true
-
-            } catch (_: SocketTimeoutException) {
-                // Log or handle timeout silently
-            } catch (_: IOException) {
-                // Log or handle network error silently
-            } catch (_: Exception) {
-                // Log or handle generic error silently
-            }
-
-            // Notify main thread of result
-            withContext(Dispatchers.Main) {
-                if (wasSuccessful) {
-                    showCustomToast("✅ Notification Sent")
-                }
-                success(wasSuccessful)
-            }
+    @SuppressLint("SetTextI18n")
+    private fun confirmDeleteSelectedItems() {
+        val selectedIds = listAdapter.getSelectedItems()
+        if (selectedIds.isEmpty()) return
+        val dialogBinding = DialogConfirmBinding.inflate(LayoutInflater.from(this))
+        val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialogBinding.listName.text = "Delete ${selectedIds.size} selected lists?"
+        dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
+        dialogBinding.btnDelete.setOnClickListener {
+            viewModel.deleteSelectedItems(selectedIds)
+            dialog.dismiss()
         }
+        dialog.show()
     }
 
-    override fun onDestroy() {
-        realTimeListeners.forEach { it.remove() }
-        noInternetSnackbar?.dismiss()
-        scope.cancel()
-        super.onDestroy()
-    }
-
-    @Deprecated("Use OnBackPressedDispatcher instead")
-    override fun onBackPressed() {
-        if (listAdapter.isSelectionModeActive()) {
-            listAdapter.clearSelection()
-            toggleSelectionMode(false)
-        } else super.onBackPressed()
+    private fun editSelectedItem() {
+        val selectedId = listAdapter.getSelectedItems().singleOrNull() ?: return
+        viewModel.uiState.value?.shoppingLists?.find { it.id == selectedId }?.let { showModifyDialog(true, it) }
     }
 
     private fun setupDragAndDrop() {
@@ -620,7 +300,6 @@ class ListManagementActivity : AppCompatActivity() {
                 listAdapter.moveItem(vh.adapterPosition, target.adapterPosition)
                 return true
             }
-
             override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
         }
         ItemTouchHelper(callback).attachToRecyclerView(binding.recyclerView)
@@ -628,19 +307,15 @@ class ListManagementActivity : AppCompatActivity() {
 
     private fun showLoadingDialog() {
         if (loadingDialog?.isShowing == true) return
-
         val dialogView = LayoutInflater.from(this).inflate(R.layout.layout_loading, null)
         val animationView = dialogView.findViewById<LottieAnimationView>(R.id.loading_animation)
         animationView.playAnimation()
-
         loadingDialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
             .create()
-
         loadingDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
         loadingDialog?.show()
-
         val widthPx = resources.getDimensionPixelSize(R.dimen.loading_dialog_width)
         loadingDialog?.window?.setLayout(widthPx, WindowManager.LayoutParams.WRAP_CONTENT)
     }
@@ -654,15 +329,20 @@ class ListManagementActivity : AppCompatActivity() {
     private fun showCustomToast(message: String) {
         val inflater = LayoutInflater.from(this)
         val layout = inflater.inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
-
         val toastText = layout.findViewById<TextView>(R.id.toast_text)
         toastText.text = message
-
         val toast = Toast(this)
         toast.duration = Toast.LENGTH_LONG
-        toast.setGravity(Gravity.CENTER, 0, 0) // ✅ Center toast on screen
+        toast.setGravity(Gravity.CENTER, 0, 0)
         toast.view = layout
-
         toast.show()
+    }
+
+    @Deprecated("Use OnBackPressedDispatcher instead")
+    override fun onBackPressed() {
+        if (listAdapter.isSelectionModeActive()) {
+            listAdapter.clearSelection()
+            toggleSelectionMode(false)
+        } else super.onBackPressed()
     }
 }

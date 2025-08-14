@@ -13,7 +13,6 @@ import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.firestore.FieldPath
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -46,7 +45,6 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         setupRecyclerView()
         startFirestoreListener(listId!!)
 
-        // Handle back press: clear selection if active
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             if (::adapter.isInitialized && adapter.getSelectedItems().isNotEmpty()) {
                 adapter.clearSelection()
@@ -56,14 +54,12 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
             }
         }
 
-        // Background click clears selection mode
         binding.root.setOnClickListener {
             if (::adapter.isInitialized && adapter.getSelectedItems().isNotEmpty()) {
                 adapter.clearSelection()
             }
         }
 
-        // Arrow click listeners
         binding.upArrowAnimation.setOnClickListener {
             binding.recyclerViewPending.smoothScrollToPosition(0)
             hideArrows()
@@ -90,14 +86,13 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         recyclerView.layoutManager = LinearLayoutManager(requireContext())
         recyclerView.adapter = adapter
 
-        // Initial arrow evaluation
         recyclerView.viewTreeObserver.addOnGlobalLayoutListener {
             evaluateArrowsVisibility()
         }
 
         recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                hideArrows() // Hide while scrolling
+                hideArrows()
             }
 
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -144,17 +139,23 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
                 }
 
                 if (snapshot != null && snapshot.exists()) {
-                    val rawMap =
-                        snapshot.get("pendingItems") as? Map<*, *> ?: emptyMap<Any?, Any?>()
+                    val rawMap = snapshot.get("items") as? Map<*, *> ?: emptyMap<Any?, Any?>()
+
                     val parsedMap = rawMap.mapNotNull { entry ->
                         val itemName = entry.key as? String ?: return@mapNotNull null
-                        val rawValue = entry.value
-                        val isImportant = when (rawValue) {
-                            is Boolean -> rawValue
-                            is String -> rawValue.equals("true", ignoreCase = true)
-                            else -> false
-                        }
-                        itemName to isImportant
+                        val rawValue = entry.value as? Map<*, *> ?: return@mapNotNull null
+
+                        val addedBy = rawValue["addedBy"] as? String ?: ""
+                        val addedAt = rawValue["addedAt"] as? com.google.firebase.Timestamp
+                        val important = rawValue["important"] as? Boolean == true
+                        val pending = rawValue["pending"] as? Boolean != false
+
+                        itemName to ShoppingItem(
+                            addedBy = addedBy,
+                            addedAt = addedAt,
+                            important = important,
+                            pending = pending
+                        )
                     }.toMap()
 
                     adapter.updateList(parsedMap)
@@ -166,16 +167,13 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
     private fun markItemAsFinished(itemName: String) {
         listId?.let { id ->
             val docRef = db.collection("shopping_lists").document(id)
-
-            docRef.update(FieldPath.of("pendingItems", itemName), FieldValue.delete())
+            docRef.update("items.$itemName.pending", false)
                 .addOnSuccessListener {
-                    docRef.update("finishedItems", FieldValue.arrayUnion(itemName))
-                        .addOnFailureListener {
-                            showToast("Failed to move item to finished")
-                        }
+                    // Instantly remove from pending list so UI updates without waiting for Firestore
+                    adapter.removeItem(itemName)
                 }
                 .addOnFailureListener {
-                    showToast("Failed to update pending list")
+                    showToast("Failed to mark item as finished")
                 }
         }
     }
@@ -183,8 +181,6 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
     private fun showToast(message: String) {
         Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
     }
-
-    // --- SelectionListener interface implementation ---
 
     override fun onSelectionStarted() {
         (activity as? ListActivity)?.enterSelectionMode()
@@ -231,7 +227,7 @@ class PendingItemsFragment : Fragment(), ItemAdapter.SelectionListener {
         val listRef = db.collection("shopping_lists").document(listId!!)
 
         for (item in selectedItems) {
-            batch.update(listRef, "pendingItems.$item", FieldValue.delete())
+            batch.update(listRef, "items.$item", FieldValue.delete())
         }
 
         batch.commit()

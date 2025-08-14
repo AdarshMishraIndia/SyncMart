@@ -5,13 +5,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.view.*
 import android.view.inputmethod.InputMethodManager
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.edit
 import com.google.android.material.tabs.TabLayoutMediator
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.mana.syncmart.databinding.ActivityListBinding
@@ -23,7 +23,7 @@ import java.util.*
 class ListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityListBinding
-    private lateinit var db: FirebaseFirestore
+    private val db = FirebaseFirestore.getInstance()
     private var listId: String? = null
     private var currentListName = "Shopping List"
     private val menuDeleteId = 1001
@@ -34,11 +34,10 @@ class ListActivity : AppCompatActivity() {
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
 
-        db = FirebaseFirestore.getInstance()
         listId = intent.getStringExtra("LIST_ID")
         binding.toolbar.title = "Loading..."
 
-        if (listId == null) {
+        if (listId.isNullOrEmpty()) {
             showToast("❌ Invalid list ID.")
             fallbackSetup()
         } else {
@@ -51,21 +50,23 @@ class ListActivity : AppCompatActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                startActivity(Intent(this@ListActivity, ListManagementActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                })
+                startActivity(
+                    Intent(this@ListActivity, ListManagementActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                )
                 finish()
             }
         })
     }
 
+    /** Load list metadata and setup ViewPager */
     private fun loadListData(id: String) {
         db.collection("shopping_lists").document(id).get()
-            .addOnSuccessListener { document ->
-                if (document.exists()) {
-                    val name = document.getString("listName") ?: "Shopping List"
-                    currentListName = name
-                    binding.toolbar.title = name
+            .addOnSuccessListener { doc ->
+                if (doc.exists()) {
+                    currentListName = doc.getString("listName") ?: "Shopping List"
+                    binding.toolbar.title = currentListName
                     setupViewPager(id)
                 } else {
                     showToast("❌ List not found. Using default.")
@@ -85,13 +86,12 @@ class ListActivity : AppCompatActivity() {
         }.attach()
     }
 
+    /** Show dialog to add new items */
     private fun showAddItemsDialog() {
         val dialogBinding = DialogAddItemsBinding.inflate(layoutInflater)
         val dialog = AlertDialog.Builder(this).setView(dialogBinding.root).create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-
-        // Request focus and show keyboard
         dialog.setOnShowListener {
             dialogBinding.editTextTextMultiLine.requestFocus()
             Handler(mainLooper).postDelayed({
@@ -107,38 +107,76 @@ class ListActivity : AppCompatActivity() {
                 .trim().lines().map { it.trim() }.filter { it.isNotEmpty() }
 
             if (items.isEmpty()) showToast("❌ Enter at least one item.")
-            else addItemsToPendingList(items)
+            else addItemsToList(items)
 
             dialog.dismiss()
         }
     }
 
-    private fun addItemsToPendingList(items: List<String>) {
-        listId?.let {
-            db.collection("shopping_lists").document(it)
-                .set(mapOf("pendingItems" to items.associateWith { false }), SetOptions.merge())
-                .addOnFailureListener { showToast("❌ Failed to add items.") }
+    /** Add items to Firestore */
+    /** Add items to Firestore with actual user name instead of UID/email */
+    private fun addItemsToList(items: List<String>) {
+        val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
+        val email = user?.email
+        if (email.isNullOrEmpty()) {
+            showToast("❌ Not signed in.")
+            return
         }
+
+        val userRef = db.collection("Users").document(email)
+        userRef.get()
+            .addOnSuccessListener { userDoc ->
+                if (!userDoc.exists()) {
+                    showToast("❌ User not found in database.")
+                    return@addOnSuccessListener
+                }
+
+                val userName = userDoc.getString("name") ?: "Unknown"
+
+                listId?.let { id ->
+                    val newItems = items.associateWith {
+                        ShoppingItem(
+                            addedBy = userName,
+                            addedAt = Timestamp.now(),
+                            important = false,
+                            pending = true
+                        )
+                    }
+
+                    db.collection("shopping_lists").document(id)
+                        .set(mapOf("items" to newItems), SetOptions.merge())
+                        .addOnSuccessListener { showToast("✅ Items added.") }
+                        .addOnFailureListener { showToast("❌ Failed to add items.") }
+                }
+            }
+            .addOnFailureListener {
+                showToast("❌ Failed to fetch user info: ${it.message}")
+            }
     }
 
+
+
+    /** Share pending items */
     private fun sharePendingItems() {
-        listId?.let {
-            db.collection("shopping_lists").document(it).get()
+        listId?.let { id ->
+            db.collection("shopping_lists").document(id).get()
                 .addOnSuccessListener { doc ->
-                    val items = (doc["pendingItems"] as? Map<*, *>)?.keys?.filterIsInstance<String>().orEmpty()
-                    if (items.isEmpty()) showToast("❌ No items to share.")
+                    val itemsMap = safeItemsMap(doc)
+                    val pendingItems = itemsMap.filter { it.value.pending }.keys.toList()
+
+                    if (pendingItems.isEmpty()) showToast("❌ No items to share.")
                     else {
                         val shareIntent = Intent(Intent.ACTION_SEND).apply {
                             type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, items.joinToString("\n") { "• $it" })
+                            putExtra(Intent.EXTRA_TEXT, pendingItems.joinToString("\n") { "• $it" })
                         }
                         startActivity(Intent.createChooser(shareIntent, "Share List"))
                     }
                 }
-                .addOnFailureListener { showToast("❌ Unable to fetch items.") }
         }
     }
 
+    /** Check if finished items need clearing */
     private fun checkAndClearFinishedItems() {
         val id = listId ?: return showToast("❌ listId is null")
         val prefs = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
@@ -162,29 +200,39 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun clearFinishedItems(key: String, date: String) {
-        listId?.let {
-            db.collection("shopping_lists").document(it)
-                .update("finishedItems", emptyList<String>())
-                .addOnSuccessListener {
-                    getSharedPreferences("SyncMartPrefs", MODE_PRIVATE).edit {
-                        putString(key, date)
-                    }
+        listId?.let { id ->
+            db.collection("shopping_lists").document(id).get()
+                .addOnSuccessListener { doc ->
+                    val itemsMap = safeItemsMap(doc)
+                    val pendingOnly = itemsMap.filter { it.value.pending }
+                    db.collection("shopping_lists").document(id)
+                        .set(mapOf("items" to pendingOnly), SetOptions.merge())
+                        .addOnSuccessListener {
+                            getSharedPreferences("SyncMartPrefs", MODE_PRIVATE).edit {
+                                putString(key, date)
+                            }
+                        }
+                        .addOnFailureListener { showToast("❌ Clearing error: ${it.message}") }
                 }
-                .addOnFailureListener { showToast("❌ Clearing error: ${it.message}") }
         }
     }
 
-    private fun showToast(msg: String) {
-        val layout = LayoutInflater.from(this).inflate(R.layout.custom_toast_layout, findViewById(android.R.id.content), false)
-        layout.findViewById<TextView>(R.id.toast_text).text = msg
-        Toast(this).apply {
-            duration = Toast.LENGTH_LONG
-            setGravity(Gravity.CENTER, 0, 0)
-            view = layout
-            show()
-        }
+    /** Safe conversion from Firestore doc to Map<String, ShoppingItem> */
+    private fun safeItemsMap(doc: com.google.firebase.firestore.DocumentSnapshot): Map<String, ShoppingItem> {
+        val raw = doc["items"] as? Map<*, *> ?: return emptyMap()
+        return raw.mapNotNull { (k, v) ->
+            val key = k as? String ?: return@mapNotNull null
+            val map = v as? Map<*, *> ?: return@mapNotNull null
+            val addedBy = map["addedBy"] as? String ?: ""
+            val addedAt = map["addedAt"] as? Timestamp ?: Timestamp.now()
+            val important = map["important"] as? Boolean == true
+            val pending = map["pending"] as? Boolean != false
+            key to ShoppingItem(addedBy, addedAt, important, pending)
+        }.sortedBy { it.second.addedAt?.seconds } // sort by timestamp
+            .toMap() // convert back to Map<String, ShoppingItem>
     }
 
+    /** Toolbar selection handling */
     fun enterSelectionMode() {
         binding.toolbar.apply {
             title = "Select Items"
@@ -212,10 +260,9 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun fallbackSetup() {
-        if (binding.toolbar.title == "Loading...") {
-            currentListName = "Shopping List"
-            binding.toolbar.title = currentListName
-        }
-        listId?.let { setupViewPager(it) }
+        binding.toolbar.title = "Shopping List"
+        setupViewPager("default_list_id")
     }
+
+    private fun showToast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 }

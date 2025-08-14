@@ -69,6 +69,9 @@ dependencies {
     implementation(libs.play.services.auth)
     implementation(libs.google.identity)
     implementation(libs.lottie)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.livedata.ktx)
+    implementation(libs.kotlinx.coroutines.android)
 }
 
 repositories {

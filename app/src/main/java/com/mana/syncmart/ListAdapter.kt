@@ -40,9 +40,10 @@ class ListAdapter(
         }
 
         private fun updateNotifBubble(item: ShoppingList) {
+            val pendingCount = item.items.values.count { it.pending } // Count only pending items
             binding.notifBubble.apply {
-                visibility = if (item.pendingItems.isNotEmpty()) View.VISIBLE else View.GONE
-                text = item.pendingItems.size.toString()
+                visibility = if (pendingCount > 0) View.VISIBLE else View.GONE
+                text = pendingCount.toString()
             }
         }
 

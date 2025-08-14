@@ -12,10 +12,11 @@ import com.mana.syncmart.databinding.ListElementRecyclerLayoutBinding
 
 class ItemAdapter(
     private var listId: String,
-    private var items: MutableList<Pair<String, Boolean>>,
+    var items: MutableList<Pair<String, ShoppingItem>>,
     private val onItemChecked: (String) -> Unit,
-    private val showButtons: Boolean,
-    private val selectionListener: SelectionListener? = null
+    private val showButtons: Boolean, // true = pending mode, false = finished mode
+    private val selectionListener: SelectionListener? = null,
+    private val onInfoClick: ((ShoppingItem, String) -> Unit)? = null // NEW: Info click callback
 ) : RecyclerView.Adapter<ItemAdapter.ViewHolder>() {
 
     private val db = FirebaseFirestore.getInstance()
@@ -41,93 +42,121 @@ class ItemAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val (item, isImportant) = items[position]
+        val (itemName, item) = items[position]
         val context = holder.itemView.context
 
-        holder.itemName.text = item
+        holder.itemName.text = itemName
 
-        val visibility = if (showButtons && !selectionMode) View.VISIBLE else View.INVISIBLE
-        holder.btnImportant.visibility = visibility
-        holder.btnSettings.visibility = visibility
+        if (showButtons) {
+            // Pending items mode
+            holder.btnImportant.visibility = View.VISIBLE
+            holder.btnSettings.visibility = View.VISIBLE
+            holder.btnSettings.setImageResource(R.drawable.ic_tick)
 
-        val isSelected = selectedItems.contains(item)
+            holder.btnImportant.setImageResource(
+                if (item.important) R.drawable.ic_star_important else R.drawable.ic_star
+            )
 
-        // Set background based on selection or importance
-        if (isSelected) {
-            holder.itemRoot.setBackgroundResource(R.drawable.selected_bg)
-        } else {
-            val backgroundRes = if (isImportant) {
-                R.drawable.list_element_recycler_bg_important
-            } else {
-                R.drawable.list_element_recycler_bg
+            holder.btnImportant.setOnClickListener {
+                if (!selectionMode) {
+                    val newImportant = !item.important
+                    items[position] = itemName to item.copy(important = newImportant)
+                    notifyItemChanged(position)
+
+                    db.collection("shopping_lists")
+                        .document(listId)
+                        .update("items.$itemName.important", newImportant)
+                }
             }
-            holder.itemRoot.setBackgroundResource(backgroundRes)
+
+            holder.btnSettings.setOnClickListener {
+                if (!selectionMode) onItemChecked(itemName)
+            }
+
+            // Enable selection in pending mode
+            holder.itemRoot.setOnLongClickListener {
+                if (!selectionMode) {
+                    selectionMode = true
+                    selectedItems.add(itemName)
+                    selectionListener?.onSelectionStarted()
+                    notifyItemChanged(position)
+                    selectionListener?.onSelectionChanged(selectedItems.size)
+                }
+                true
+            }
+
+            holder.itemRoot.setOnClickListener {
+                if (selectionMode) toggleSelection(itemName, position)
+            }
+
+        } else {
+            // Finished items mode
+            holder.btnImportant.visibility = View.INVISIBLE
+            holder.btnSettings.visibility = View.VISIBLE
+            holder.btnSettings.imageTintList = null
+            holder.btnSettings.setImageResource(R.drawable.ic_info)
+            holder.btnSettings.setOnClickListener {
+                onInfoClick?.invoke(item, itemName) // Call fragment's handler
+            }
+
+            // No selection in finished mode
+            holder.itemRoot.setOnClickListener(null)
+            holder.itemRoot.setOnLongClickListener(null)
         }
+
+        val isSelected = selectedItems.contains(itemName)
+        holder.itemRoot.setBackgroundResource(
+            when {
+                isSelected -> R.drawable.selected_bg
+                item.important -> R.drawable.list_element_recycler_bg_important
+                else -> R.drawable.list_element_recycler_bg
+            }
+        )
 
         holder.itemName.setTextColor(
-            context.getColor(if (isImportant || isSelected) R.color.white else R.color.black)
+            context.getColor(if (item.important || isSelected) R.color.white else R.color.black)
         )
-
-        // Long press: enter selection mode
-        holder.itemRoot.setOnLongClickListener {
-            if (!selectionMode) {
-                selectionMode = true
-                selectedItems.add(item)
-                selectionListener?.onSelectionStarted()
-                notifyItemChanged(position)
-                selectionListener?.onSelectionChanged(selectedItems.size)
-            }
-            true
-        }
-
-        // Click: toggle selection if in selection mode, otherwise normal action
-        holder.itemRoot.setOnClickListener {
-            if (selectionMode) {
-                toggleSelection(item, position)
-            }
-        }
-
-        // Set correct icon based on importance
-        holder.btnImportant.setImageResource(
-            if (isImportant) R.drawable.ic_star_important else R.drawable.ic_star
-        )
-
-        // Star icon click
-        holder.btnImportant.setOnClickListener {
-            if (!selectionMode) {
-                val newImportant = !isImportant
-                items[position] = item to newImportant
-                notifyItemChanged(position)
-                db.collection("shopping_lists")
-                    .document(listId)
-                    .update("pendingItems.$item", newImportant)
-            }
-        }
-
-        holder.btnSettings.setOnClickListener {
-            if (!selectionMode) onItemChecked(item)
-        }
     }
 
     override fun getItemCount(): Int = items.size
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateList(newItems: Map<String, Boolean>) {
+    fun updateList(newItems: Map<String, ShoppingItem>) {
         items.clear()
-        items.addAll(newItems.map { it.key to it.value })
+        if (showButtons) {
+            // pending items
+            items.addAll(
+                newItems.entries
+                    .filter { it.value.pending }
+                    .sortedByDescending { it.value.addedAt ?: com.google.firebase.Timestamp.now() }
+                    .map { it.key to it.value }
+            )
+        } else {
+            // finished items
+            items.addAll(
+                newItems.entries
+                    .filter { !it.value.pending }
+                    .sortedByDescending { it.value.addedAt ?: com.google.firebase.Timestamp.now() }
+                    .map { it.key to it.value }
+            )
+        }
         selectedItems.clear()
         selectionMode = false
         notifyDataSetChanged()
         selectionListener?.onSelectionCleared()
     }
 
-    private fun toggleSelection(item: String, position: Int) {
-        if (selectedItems.contains(item)) {
-            selectedItems.remove(item)
-        } else {
-            selectedItems.add(item)
+    fun removeItem(itemName: String) {
+        val index = items.indexOfFirst { it.first == itemName }
+        if (index != -1) {
+            items.removeAt(index)
+            notifyItemRemoved(index)
         }
+    }
 
+    private fun toggleSelection(item: String, position: Int) {
+        if (!showButtons) return // no selection in finished mode
+        if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
         notifyItemChanged(position)
 
         if (selectedItems.isEmpty()) {
@@ -140,6 +169,7 @@ class ItemAdapter(
 
     @SuppressLint("NotifyDataSetChanged")
     fun clearSelection() {
+        if (!showButtons) return
         selectionMode = false
         selectedItems.clear()
         notifyDataSetChanged()
