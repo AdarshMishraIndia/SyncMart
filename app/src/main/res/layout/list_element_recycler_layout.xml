@@ -12,7 +12,7 @@
 
     <!-- Button Name -->
     <TextView
-        android:id="@+id/buttonName"
+        android:id="@+id/itemName"
         android:layout_width="0dp"
         android:layout_weight="1"
         android:layout_height="wrap_content"
@@ -20,21 +20,31 @@
         android:textSize="18sp"
         android:textColor="@android:color/black" />
 
-    <!-- Bin (Delete) Button -->
+    <!-- Info Button -->
     <ImageButton
-        android:id="@+id/btnImportant"
+        android:id="@+id/btnInfo"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="?attr/selectableItemBackgroundBorderless"
-        android:contentDescription="Important"
+        android:importantForAccessibility="no"
+        android:scaleType="centerInside"
+        android:src="@drawable/ic_info"
+        tools:ignore="TouchTargetSizeCheck,ImageContrastCheck" />
+
+    <!-- Star Button -->
+    <ImageButton
+        android:id="@+id/btnStar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:importantForAccessibility="no"
         android:scaleType="centerInside"
         android:src="@drawable/ic_star"
-        tools:ignore="HardcodedText,TouchTargetSizeCheck,ImageContrastCheck" />
+        tools:ignore="TouchTargetSizeCheck,ImageContrastCheck" />
 
-
-    <!-- Gear (Settings) Button -->
+    <!-- Tick Button -->
     <ImageButton
-        android:id="@+id/btnSettings"
+        android:id="@+id/btnTick"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:background="?attr/selectableItemBackgroundBorderless"

@@ -4,9 +4,11 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!-- Outer Circle -->
+    <!-- Outer Circle with outline -->
     <path
         android:fillColor="#000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.5"
         android:pathData="M12,2
                           C6.48,2 2,6.48 2,12
                           c0,5.52 4.48,10 10,10

@@ -5,34 +5,29 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-import com.google.firebase.firestore.FirebaseFirestore
 import com.mana.syncmart.databinding.ListElementRecyclerLayoutBinding
+import android.view.Gravity
 
 class ItemAdapter(
-    private var listId: String,
     var items: MutableList<Pair<String, ShoppingItem>>,
-    private val onItemChecked: (String) -> Unit,
-    private val showButtons: Boolean, // true = pending mode, false = finished mode
-    private val selectionListener: SelectionListener? = null,
-    private val onInfoClick: ((ShoppingItem, String) -> Unit)? = null // NEW: Info click callback
+    private val selectionManager: SelectionManager? = null,
+    private val onItemClick: ((String) -> Unit)? = null,
+    private val onInfoClick: ((ShoppingItem, String) -> Unit)? = null,
+    private val onStarClick: ((Int) -> Unit)? = null,
+    private val onTickClick: ((String) -> Unit)? = null,
+    private val isFinishedMode: Boolean = false,
+    private val onSelectionChanged: ((selectedCount: Int) -> Unit)? = null,
+    private val onSelectionCleared: (() -> Unit)? = null
 ) : RecyclerView.Adapter<ItemAdapter.ViewHolder>() {
 
-    private val db = FirebaseFirestore.getInstance()
-    private val selectedItems = mutableSetOf<String>()
-    private var selectionMode = false
-
-    interface SelectionListener {
-        fun onSelectionStarted()
-        fun onSelectionChanged(selectedCount: Int)
-        fun onSelectionCleared()
-    }
-
     class ViewHolder(binding: ListElementRecyclerLayoutBinding) : RecyclerView.ViewHolder(binding.root) {
-        val itemName: TextView = binding.buttonName
-        val btnImportant: ImageButton = binding.btnImportant
-        val btnSettings: ImageButton = binding.btnSettings
+        val itemName: TextView = binding.itemName
+        val btnStar: ImageButton = binding.btnStar
+        val btnTick: ImageButton = binding.btnTick
+        val btnInfo: ImageButton = binding.btnInfo
         val itemRoot = binding.root
     }
 
@@ -43,68 +38,50 @@ class ItemAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val (itemName, item) = items[position]
-        val context = holder.itemView.context
-
         holder.itemName.text = itemName
 
-        if (showButtons) {
-            // Pending items mode
-            holder.btnImportant.visibility = View.VISIBLE
-            holder.btnSettings.visibility = View.VISIBLE
-            holder.btnSettings.setImageResource(R.drawable.ic_tick)
+        // Star button
+        holder.btnStar.setImageResource(if (item.important) R.drawable.ic_star_important else R.drawable.ic_star)
+        holder.btnStar.setOnClickListener { onStarClick?.invoke(position) }
 
-            holder.btnImportant.setImageResource(
-                if (item.important) R.drawable.ic_star_important else R.drawable.ic_star
-            )
+        // Tick button
+        holder.btnTick.setImageResource(R.drawable.ic_tick)
+        holder.btnTick.setOnClickListener { onTickClick?.invoke(itemName) }
 
-            holder.btnImportant.setOnClickListener {
-                if (!selectionMode) {
-                    val newImportant = !item.important
-                    items[position] = itemName to item.copy(important = newImportant)
-                    notifyItemChanged(position)
+        // Info button
+        holder.btnInfo.setOnClickListener { onInfoClick?.invoke(item, itemName) }
 
-                    db.collection("shopping_lists")
-                        .document(listId)
-                        .update("items.$itemName.important", newImportant)
-                }
-            }
-
-            holder.btnSettings.setOnClickListener {
-                if (!selectionMode) onItemChecked(itemName)
-            }
-
-            // Enable selection in pending mode
-            holder.itemRoot.setOnLongClickListener {
-                if (!selectionMode) {
-                    selectionMode = true
-                    selectedItems.add(itemName)
-                    selectionListener?.onSelectionStarted()
-                    notifyItemChanged(position)
-                    selectionListener?.onSelectionChanged(selectedItems.size)
-                }
-                true
-            }
-
-            holder.itemRoot.setOnClickListener {
-                if (selectionMode) toggleSelection(itemName, position)
-            }
-
+        // Selection & finished mode visibility
+        val isSelected = selectionManager?.isSelected(itemName) == true
+        if (isFinishedMode) {
+            holder.btnStar.visibility = View.GONE
+            holder.btnTick.visibility = View.GONE
+            (holder.btnInfo.layoutParams as LinearLayout.LayoutParams).gravity = Gravity.END
         } else {
-            // Finished items mode
-            holder.btnImportant.visibility = View.INVISIBLE
-            holder.btnSettings.visibility = View.VISIBLE
-            holder.btnSettings.imageTintList = null
-            holder.btnSettings.setImageResource(R.drawable.ic_info)
-            holder.btnSettings.setOnClickListener {
-                onInfoClick?.invoke(item, itemName) // Call fragment's handler
-            }
-
-            // No selection in finished mode
-            holder.itemRoot.setOnClickListener(null)
-            holder.itemRoot.setOnLongClickListener(null)
+            holder.btnStar.visibility = if (isSelected) View.INVISIBLE else View.VISIBLE
+            holder.btnTick.visibility = if (isSelected) View.INVISIBLE else View.VISIBLE
         }
 
-        val isSelected = selectedItems.contains(itemName)
+        // Click listeners for selection
+        holder.itemRoot.setOnClickListener {
+            if (selectionManager?.isSelectionActive() == true) {
+                selectionManager.toggleSelection(itemName)
+                notifyItemChanged(position)
+                onSelectionChanged?.invoke(selectionManager.getSelectedItems().size)
+                if (!selectionManager.isSelectionActive()) onSelectionCleared?.invoke()
+            } else {
+                onItemClick?.invoke(itemName)
+            }
+        }
+
+        holder.itemRoot.setOnLongClickListener {
+            selectionManager?.toggleSelection(itemName)
+            notifyItemChanged(position)
+            onSelectionChanged?.invoke(selectionManager?.getSelectedItems()?.size ?: 0)
+            true
+        }
+
+        // Background & text color
         holder.itemRoot.setBackgroundResource(
             when {
                 isSelected -> R.drawable.selected_bg
@@ -112,38 +89,19 @@ class ItemAdapter(
                 else -> R.drawable.list_element_recycler_bg
             }
         )
-
         holder.itemName.setTextColor(
-            context.getColor(if (item.important || isSelected) R.color.white else R.color.black)
+            holder.itemView.context.getColor(if (isSelected || item.important) R.color.white else R.color.black)
         )
     }
+
 
     override fun getItemCount(): Int = items.size
 
     @SuppressLint("NotifyDataSetChanged")
-    fun updateList(newItems: Map<String, ShoppingItem>) {
+    fun updateList(newItems: List<Pair<String, ShoppingItem>>) {
         items.clear()
-        if (showButtons) {
-            // pending items
-            items.addAll(
-                newItems.entries
-                    .filter { it.value.pending }
-                    .sortedByDescending { it.value.addedAt ?: com.google.firebase.Timestamp.now() }
-                    .map { it.key to it.value }
-            )
-        } else {
-            // finished items
-            items.addAll(
-                newItems.entries
-                    .filter { !it.value.pending }
-                    .sortedByDescending { it.value.addedAt ?: com.google.firebase.Timestamp.now() }
-                    .map { it.key to it.value }
-            )
-        }
-        selectedItems.clear()
-        selectionMode = false
+        items.addAll(newItems)
         notifyDataSetChanged()
-        selectionListener?.onSelectionCleared()
     }
 
     fun removeItem(itemName: String) {
@@ -154,27 +112,19 @@ class ItemAdapter(
         }
     }
 
-    private fun toggleSelection(item: String, position: Int) {
-        if (!showButtons) return // no selection in finished mode
-        if (selectedItems.contains(item)) selectedItems.remove(item) else selectedItems.add(item)
-        notifyItemChanged(position)
-
-        if (selectedItems.isEmpty()) {
-            selectionMode = false
-            selectionListener?.onSelectionCleared()
-        } else {
-            selectionListener?.onSelectionChanged(selectedItems.size)
-        }
-    }
-
     @SuppressLint("NotifyDataSetChanged")
     fun clearSelection() {
-        if (!showButtons) return
-        selectionMode = false
-        selectedItems.clear()
+        selectionManager?.clearSelection()
+        onSelectionCleared?.invoke()
         notifyDataSetChanged()
-        selectionListener?.onSelectionCleared()
     }
 
-    fun getSelectedItems(): List<String> = selectedItems.toList()
+    fun deleteSelectedItems(deleteFromFirestore: (String) -> Unit) {
+        val selected = selectionManager?.getSelectedItems() ?: return
+        for (itemName in selected) {
+            deleteFromFirestore(itemName)
+            removeItem(itemName)
+        }
+        clearSelection()
+    }
 }
