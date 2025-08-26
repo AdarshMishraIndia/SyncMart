@@ -136,7 +136,7 @@ class PendingItemsFragment : Fragment() {
                     )
                 }
                     ?.filter { it.second.pending }
-                    ?.sortedByDescending { it.second.addedAt } ?: emptyList()
+                    ?.sortedBy { it.second.addedAt } ?: emptyList()
 
                 adapter.updateList(items)
                 updateArrowVisibility()

@@ -87,7 +87,7 @@ class FinishedItemsFragment : Fragment() {
                                 pending = false
                             )
                         } else null
-                    }.sortedByDescending { it.second.addedAt ?: Timestamp.now() }
+                    }.sortedBy { it.second.addedAt ?: Timestamp.now() }
 
                     updateItemList(finishedList)
                 }

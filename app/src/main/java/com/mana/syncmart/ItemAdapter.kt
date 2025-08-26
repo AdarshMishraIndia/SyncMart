@@ -93,18 +93,29 @@ class ItemAdapter(
         }
 
         // Background & text color
-        if (isSelected) {
-            holder.itemRoot.setBackgroundResource(R.drawable.selected_bg)
-            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
-        } else if (item.important) {
-            holder.itemRoot.setBackgroundResource(R.drawable.list_element_recycler_bg_important)
-            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
-        } else {
-            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.black))
+        when {
+            isFinishedMode -> {
+                // Neutral look in Finished tab
+                holder.itemRoot.setBackgroundResource(R.drawable.list_element_recycler_bg) // default bg
+                holder.itemName.setTextColor(holder.itemView.context.getColor(R.color.black))
+                holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.black))
+            }
+            isSelected -> {
+                holder.itemRoot.setBackgroundResource(R.drawable.selected_bg)
+                holder.itemName.setTextColor(holder.itemView.context.getColor(R.color.white))
+                holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
+            }
+            item.important -> {
+                holder.itemRoot.setBackgroundResource(R.drawable.list_element_recycler_bg_important)
+                holder.itemName.setTextColor(holder.itemView.context.getColor(R.color.white))
+                holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
+            }
+            else -> {
+                holder.itemRoot.setBackgroundResource(R.drawable.list_element_recycler_bg) // normal bg
+                holder.itemName.setTextColor(holder.itemView.context.getColor(R.color.black))
+                holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.black))
+            }
         }
-        holder.itemName.setTextColor(
-            holder.itemView.context.getColor(if (isSelected || item.important) R.color.white else R.color.black)
-        )
     }
 
 

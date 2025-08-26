@@ -26,8 +26,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // ❌ remove debug signing for release
-            // signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -60,6 +58,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.livedata.ktx)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.material)
 
     // Compose
     implementation(platform(libs.androidx.compose.bom))

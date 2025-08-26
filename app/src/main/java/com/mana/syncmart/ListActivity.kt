@@ -129,22 +129,28 @@ class ListActivity : AppCompatActivity() {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val email = user.email ?: return
         val userRef = db.collection("Users").document(email)
+
         userRef.get().addOnSuccessListener { doc ->
             val name = doc.getString("name") ?: "Unknown"
-            val newItems = items.associate { itemName ->
-                val autoId = db.collection("shopping_lists").document().id // generate random ID
+
+            val now = System.currentTimeMillis() // get current time in ms
+            val newItems = items.mapIndexed { index, itemName ->
+                val timestamp = Timestamp(Date(now + index * 1000L)) // add index seconds cumulatively
+                val autoId = db.collection("shopping_lists").document().id
                 autoId to ShoppingItem(
                     name = itemName,
                     addedBy = name,
-                    addedAt = Timestamp.now(),
+                    addedAt = timestamp,
                     important = false,
                     pending = true
                 )
-            }
+            }.toMap()
+
             listId?.let { db.collection("shopping_lists").document(it)
                 .set(mapOf("items" to newItems), SetOptions.merge()) }
         }
     }
+
 
     private fun sharePendingItems() {
         listId?.let { it ->
