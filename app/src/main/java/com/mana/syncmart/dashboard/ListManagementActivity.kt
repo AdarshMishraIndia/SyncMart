@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
@@ -27,10 +27,18 @@ import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.DialogModifyListBinding
 import android.widget.FrameLayout
 import android.view.WindowManager
+import androidx.activity.OnBackPressedCallback
+import com.mana.syncmart.Friend
+import com.mana.syncmart.FriendActivity
+import com.mana.syncmart.FriendSelectionAdapter
+import com.mana.syncmart.ListActivity
+import com.mana.syncmart.ListAdapter
+import com.mana.syncmart.R
+import com.mana.syncmart.RegisterActivity
+import com.mana.syncmart.ShoppingList
+import com.mana.syncmart.auth.AuthActivity
 
-@Suppress("DEPRECATION")
 class ListManagementActivity : AppCompatActivity() {
-
     private lateinit var binding: ActivityListManagementBinding
     private lateinit var listAdapter: ListAdapter
     private var loadingDialog: AlertDialog? = null
@@ -48,6 +56,21 @@ class ListManagementActivity : AppCompatActivity() {
             setHomeAsUpIndicator(R.drawable.ic_menu)
             title = "SyncMart"
         }
+
+        // ✅ Register back press handler
+        onBackPressedDispatcher.addCallback(this,
+            object : OnBackPressedCallback(true) {
+                override fun handleOnBackPressed() {
+                    if (listAdapter.isSelectionModeActive()) {
+                        listAdapter.clearSelection()
+                        toggleSelectionMode(false)
+                    } else {
+                        // Temporarily disable this callback and let system handle it
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                }
+            })
 
         setupRecyclerView()
         setupDragAndDrop()
@@ -174,7 +197,12 @@ class ListManagementActivity : AppCompatActivity() {
             onSelectionChanged = { isActive, count -> toggleSelectionMode(isActive, count) },
             onListClicked = { list ->
                 if (!listAdapter.isSelectionModeActive()) {
-                    startActivity(Intent(this, ListActivity::class.java).putExtra("LIST_ID", list.id))
+                    startActivity(
+                        Intent(this, ListActivity::class.java).putExtra(
+                            "LIST_ID",
+                            list.id
+                        )
+                    )
                 }
             }
         )
@@ -241,9 +269,10 @@ class ListManagementActivity : AppCompatActivity() {
     private fun updateFriendsUI(dialogBinding: DialogModifyListBinding, friendsMap: Map<String, String>, selectedEmails: MutableSet<String>) {
         toggleNoFriendsMessage(dialogBinding, friendsMap.isEmpty())
         val friendsList = friendsMap.map { Friend(it.value, it.key) }
-        val adapter = FriendSelectionAdapter(this, friendsList, selectedEmails, { friend, isChecked ->
-            if (isChecked) selectedEmails.add(friend.email) else selectedEmails.remove(friend.email)
-        }, showCheckBox = true)
+        val adapter =
+            FriendSelectionAdapter(this, friendsList, selectedEmails, { friend, isChecked ->
+                if (isChecked) selectedEmails.add(friend.email) else selectedEmails.remove(friend.email)
+            }, showCheckBox = true)
         dialogBinding.listViewMembers.adapter = adapter
         adapter.notifyDataSetChanged()
     }
@@ -336,13 +365,5 @@ class ListManagementActivity : AppCompatActivity() {
         toast.setGravity(Gravity.CENTER, 0, 0)
         toast.view = layout
         toast.show()
-    }
-
-    @Deprecated("Use OnBackPressedDispatcher instead")
-    override fun onBackPressed() {
-        if (listAdapter.isSelectionModeActive()) {
-            listAdapter.clearSelection()
-            toggleSelectionMode(false)
-        } else super.onBackPressed()
     }
 }

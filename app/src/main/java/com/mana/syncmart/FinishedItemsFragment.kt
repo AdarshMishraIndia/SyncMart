@@ -46,7 +46,7 @@ class FinishedItemsFragment : Fragment() {
             items = mutableListOf(),
             isFinishedMode = true,
             onItemClick = {}, // Clicking finished items does nothing
-            onInfoClick = { item, name -> showItemInfoDialog(item, name) }
+            onInfoClick = { item, name -> showItemInfoDialog(item) }
         )
 
         binding.recyclerViewFinished.apply {
@@ -69,16 +69,18 @@ class FinishedItemsFragment : Fragment() {
                     val itemsMap = snapshot.get("items") as? Map<*, *> ?: emptyMap<Any?, Any?>()
 
                     val finishedList = itemsMap.mapNotNull { entry ->
-                        val itemName = entry.key as? String ?: return@mapNotNull null
+                        val itemId = entry.key as? String ?: return@mapNotNull null
                         val rawValue = entry.value as? Map<*, *> ?: return@mapNotNull null
 
+                        val name = rawValue["name"] as? String ?: ""
                         val addedBy = rawValue["addedBy"] as? String ?: ""
                         val addedAt = rawValue["addedAt"] as? Timestamp
                         val important = rawValue["important"] as? Boolean == true
                         val pending = rawValue["pending"] as? Boolean != false
 
                         if (!pending) {
-                            itemName to ShoppingItem(
+                            itemId to ShoppingItem(
+                                name = name,
                                 addedBy = addedBy,
                                 addedAt = addedAt,
                                 important = important,
@@ -97,10 +99,10 @@ class FinishedItemsFragment : Fragment() {
         adapter.updateList(newItems)
     }
 
-    private fun showItemInfoDialog(item: ShoppingItem, itemName: String) {
+    private fun showItemInfoDialog(item: ShoppingItem) {
         val dialogBinding = LayoutMetadataBinding.inflate(layoutInflater)
 
-        dialogBinding.nameValue.text = itemName
+        dialogBinding.nameValue.text = item.name
         dialogBinding.addedByValue.text = item.addedBy
         dialogBinding.addedAtValue.text = item.addedAt?.let { ts -> formatTimestamp(ts) } ?: "Unknown"
 

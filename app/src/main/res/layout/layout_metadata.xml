@@ -1,5 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -8,7 +8,7 @@
     android:padding="20dp"
     tools:ignore="TextSizeCheck">
 
-    <!-- Barrier to align all values in a column -->
+    <!-- Barrier for horizontal alignment -->
     <androidx.constraintlayout.widget.Barrier
         android:id="@+id/labelBarrier"
         android:layout_width="wrap_content"
@@ -32,6 +32,7 @@
         android:shadowColor="#FFFFFF"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/addedAt"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
     <TextView
@@ -49,6 +50,7 @@
         android:shadowColor="#FFFFFF"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/name"
+        app:layout_constraintBottom_toTopOf="@id/addedBy"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
     <TextView
@@ -66,6 +68,7 @@
         android:shadowColor="#FFFFFF"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/addedAt"
+        app:layout_constraintBottom_toBottomOf="parent"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
     <!-- Values -->
@@ -88,7 +91,8 @@
         android:layout_marginStart="5dp"
         app:layout_constraintStart_toEndOf="@id/labelBarrier"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBaseline_toBaselineOf="@id/name"
+        app:layout_constraintTop_toTopOf="@id/name"
+        app:layout_constraintBottom_toBottomOf="@id/name"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
     <TextView
@@ -110,7 +114,8 @@
         android:layout_marginStart="5dp"
         app:layout_constraintStart_toEndOf="@id/labelBarrier"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBaseline_toBaselineOf="@id/addedAt"
+        app:layout_constraintTop_toTopOf="@id/addedAt"
+        app:layout_constraintBottom_toBottomOf="@id/addedAt"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
     <TextView
@@ -132,7 +137,8 @@
         android:layout_marginStart="5dp"
         app:layout_constraintStart_toEndOf="@id/labelBarrier"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintBaseline_toBaselineOf="@id/addedBy"
+        app:layout_constraintTop_toTopOf="@id/addedBy"
+        app:layout_constraintBottom_toBottomOf="@id/addedBy"
         tools:ignore="HardcodedText,RtlHardcoded" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

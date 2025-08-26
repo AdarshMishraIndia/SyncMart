@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import android.app.Application
 import androidx.lifecycle.ViewModel

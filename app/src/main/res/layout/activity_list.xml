@@ -24,7 +24,7 @@
         app:tabIndicatorColor="@android:color/white"
         app:tabMode="fixed"
         app:tabSelectedTextColor="@android:color/black"
-        app:tabTextColor="@android:color/white"
+        app:tabTextColor="#C7C6C6"
         tools:ignore="SpeakableTextPresentCheck" />
 
     <!-- RelativeLayout to Overlay ImageButton on ViewPager2 -->

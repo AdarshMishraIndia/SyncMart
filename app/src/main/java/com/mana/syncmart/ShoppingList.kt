@@ -3,6 +3,7 @@ package com.mana.syncmart
 import com.google.firebase.Timestamp
 
 data class ShoppingItem(
+    val name: String = "",
     val addedBy: String = "",
     val addedAt: Timestamp? = null,
     val important: Boolean = false,

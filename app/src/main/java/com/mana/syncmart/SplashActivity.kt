@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
+import com.mana.syncmart.auth.AuthActivity
 
 @SuppressLint("CustomSplashScreen")
 @Suppress("DEPRECATION")

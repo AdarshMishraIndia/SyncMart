@@ -28,6 +28,7 @@ class ItemAdapter(
         val btnStar: ImageButton = binding.btnStar
         val btnTick: ImageButton = binding.btnTick
         val btnInfo: ImageButton = binding.btnInfo
+        val itemAddedAt: TextView = binding.itemAddedAt
         val itemRoot = binding.root
     }
 
@@ -37,8 +38,11 @@ class ItemAdapter(
     }
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        val (itemName, item) = items[position]
-        holder.itemName.text = itemName
+        val (itemId, item) = items[position]
+        holder.itemName.text = item.name
+
+        // Show formatted addedAt in the lower right
+        holder.itemAddedAt.text = item.addedAt?.let { formatTimestamp(it) } ?: "Unknown"
 
         // Star button
         holder.btnStar.setImageResource(if (item.important) R.drawable.ic_star_important else R.drawable.ic_star)
@@ -46,49 +50,58 @@ class ItemAdapter(
 
         // Tick button
         holder.btnTick.setImageResource(R.drawable.ic_tick)
-        holder.btnTick.setOnClickListener { onTickClick?.invoke(itemName) }
+        holder.btnTick.setOnClickListener { onTickClick?.invoke(itemId) }
 
         // Info button
-        holder.btnInfo.setOnClickListener { onInfoClick?.invoke(item, itemName) }
+        holder.btnInfo.setOnClickListener { onInfoClick?.invoke(item, item.name) }
 
         // Selection & finished mode visibility
-        val isSelected = selectionManager?.isSelected(itemName) == true
+        val isSelected = selectionManager?.isSelected(itemId) == true
         if (isFinishedMode) {
             holder.btnStar.visibility = View.GONE
             holder.btnTick.visibility = View.GONE
             (holder.btnInfo.layoutParams as LinearLayout.LayoutParams).gravity = Gravity.END
         } else {
-            holder.btnStar.visibility = if (isSelected) View.INVISIBLE else View.VISIBLE
-            holder.btnTick.visibility = if (isSelected) View.INVISIBLE else View.VISIBLE
+            if (isSelected) {
+                holder.btnStar.visibility = View.INVISIBLE
+                holder.btnTick.visibility = View.INVISIBLE
+                holder.btnInfo.visibility = View.INVISIBLE
+            } else {
+                holder.btnStar.visibility = View.VISIBLE
+                holder.btnTick.visibility = View.VISIBLE
+                holder.btnInfo.visibility = View.VISIBLE
+            }
         }
 
         // Click listeners for selection
         holder.itemRoot.setOnClickListener {
             if (selectionManager?.isSelectionActive() == true) {
-                selectionManager.toggleSelection(itemName)
+                selectionManager.toggleSelection(itemId)
                 notifyItemChanged(position)
                 onSelectionChanged?.invoke(selectionManager.getSelectedItems().size)
                 if (!selectionManager.isSelectionActive()) onSelectionCleared?.invoke()
             } else {
-                onItemClick?.invoke(itemName)
+                onItemClick?.invoke(itemId)
             }
         }
 
         holder.itemRoot.setOnLongClickListener {
-            selectionManager?.toggleSelection(itemName)
+            selectionManager?.toggleSelection(itemId)
             notifyItemChanged(position)
             onSelectionChanged?.invoke(selectionManager?.getSelectedItems()?.size ?: 0)
             true
         }
 
         // Background & text color
-        holder.itemRoot.setBackgroundResource(
-            when {
-                isSelected -> R.drawable.selected_bg
-                item.important -> R.drawable.list_element_recycler_bg_important
-                else -> R.drawable.list_element_recycler_bg
-            }
-        )
+        if (isSelected) {
+            holder.itemRoot.setBackgroundResource(R.drawable.selected_bg)
+            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
+        } else if (item.important) {
+            holder.itemRoot.setBackgroundResource(R.drawable.list_element_recycler_bg_important)
+            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.white))
+        } else {
+            holder.itemAddedAt.setTextColor(holder.itemView.context.getColor(R.color.black))
+        }
         holder.itemName.setTextColor(
             holder.itemView.context.getColor(if (isSelected || item.important) R.color.white else R.color.black)
         )
@@ -104,8 +117,8 @@ class ItemAdapter(
         notifyDataSetChanged()
     }
 
-    fun removeItem(itemName: String) {
-        val index = items.indexOfFirst { it.first == itemName }
+    fun removeItem(itemId: String) {
+        val index = items.indexOfFirst { it.first == itemId }
         if (index != -1) {
             items.removeAt(index)
             notifyItemRemoved(index)
@@ -121,10 +134,16 @@ class ItemAdapter(
 
     fun deleteSelectedItems(deleteFromFirestore: (String) -> Unit) {
         val selected = selectionManager?.getSelectedItems() ?: return
-        for (itemName in selected) {
-            deleteFromFirestore(itemName)
-            removeItem(itemName)
+        for (itemId in selected) {
+            deleteFromFirestore(itemId)
+            removeItem(itemId)
         }
         clearSelection()
+    }
+
+    private fun formatTimestamp(timestamp: com.google.firebase.Timestamp): String {
+        val date = timestamp.toDate()
+        val formatter = java.text.SimpleDateFormat("h:mm a, d MMM yyyy", java.util.Locale.getDefault())
+        return formatter.format(date)
     }
 }

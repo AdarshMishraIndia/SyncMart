@@ -118,15 +118,24 @@ class PendingItemsFragment : Fragment() {
                 }
 
                 val items = (snapshot?.get("items") as? Map<*, *>)?.mapNotNull { entry ->
-                    val key = entry.key as? String ?: return@mapNotNull null
+                    val itemId = entry.key as? String ?: return@mapNotNull null
                     val value = entry.value as? Map<*, *> ?: return@mapNotNull null
-                    key to ShoppingItem(
-                        addedBy = value["addedBy"] as? String ?: "",
-                        addedAt = value["addedAt"] as? Timestamp,
-                        important = value["important"] as? Boolean == true,
-                        pending = value["pending"] as? Boolean != false
+
+                    val name = value["name"] as? String ?: ""
+                    val addedBy = value["addedBy"] as? String ?: ""
+                    val addedAt = value["addedAt"] as? Timestamp
+                    val important = value["important"] as? Boolean == true
+                    val pending = value["pending"] as? Boolean != false
+
+                    itemId to ShoppingItem(
+                        name = name,
+                        addedBy = addedBy,
+                        addedAt = addedAt,
+                        important = important,
+                        pending = pending
                     )
-                }?.filter { it.second.pending }
+                }
+                    ?.filter { it.second.pending }
                     ?.sortedByDescending { it.second.addedAt } ?: emptyList()
 
                 adapter.updateList(items)

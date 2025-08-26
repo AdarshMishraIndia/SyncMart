@@ -1,17 +1,22 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import android.app.Application
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.mana.syncmart.ShoppingItem
+import com.mana.syncmart.ShoppingList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,19 +61,19 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
             .getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         val networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: android.net.Network) {
+            override fun onAvailable(network: Network) {
                 viewModelScope.launch {
                     isConnectedFlow.value = true
                     fetchShoppingLists()
                 }
             }
 
-            override fun onLost(network: android.net.Network) {
+            override fun onLost(network: Network) {
                 viewModelScope.launch { isConnectedFlow.value = false }
             }
         }
 
-        val request = android.net.NetworkRequest.Builder()
+        val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         cm.registerNetworkCallback(request, networkCallback)
@@ -151,8 +156,8 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
                     for (change in snapshot.documentChanges) {
                         val docId = change.document.id
                         when (change.type) {
-                            com.google.firebase.firestore.DocumentChange.Type.ADDED,
-                            com.google.firebase.firestore.DocumentChange.Type.MODIFIED -> {
+                            DocumentChange.Type.ADDED,
+                            DocumentChange.Type.MODIFIED -> {
                                 try {
                                     val list = change.document.toObject(ShoppingList::class.java).copy(id = docId)
                                     combinedLists[docId] = list
@@ -160,7 +165,7 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
                                     _toastMessage.value = "Failed to parse list: ${e.message}"
                                 }
                             }
-                            com.google.firebase.firestore.DocumentChange.Type.REMOVED -> {
+                            DocumentChange.Type.REMOVED -> {
                                 combinedLists.remove(docId)
                             }
                         }
@@ -231,7 +236,7 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
 
     fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
         val apiUrl =
-            "https://bhashsms.com/api/sendmsg.php?user=Urban_BW&pass=ucbl123&sender=BUZWAP&phone=9668514995&text=dddd&priority=wa&stype=normal"
+            "https://bhashsms.com/api/sendmsg.php?user=Urban_BW&pass=ucbl123&sender=BUZWAP&phone=9040292104&text=dddd&priority=wa&stype=normal"
 
         viewModelScope.launch(Dispatchers.IO) {
             var wasSuccessful = false

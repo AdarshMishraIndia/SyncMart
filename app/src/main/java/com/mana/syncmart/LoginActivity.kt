@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.mana.syncmart.dashboard.ListManagementActivity
 
 class LoginActivity : ComponentActivity() {
 

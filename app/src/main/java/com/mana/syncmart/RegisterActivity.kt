@@ -14,6 +14,7 @@ import androidx.activity.ComponentActivity
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mana.syncmart.dashboard.ListManagementActivity
 
 class RegisterActivity : ComponentActivity() {
 

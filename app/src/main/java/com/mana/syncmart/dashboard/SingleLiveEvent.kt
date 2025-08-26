@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.MutableLiveData

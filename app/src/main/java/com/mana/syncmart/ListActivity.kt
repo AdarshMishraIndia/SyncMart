@@ -17,6 +17,7 @@ import com.google.android.material.tabs.TabLayoutMediator
 import java.text.SimpleDateFormat
 import java.util.*
 import androidx.core.content.ContextCompat
+import com.mana.syncmart.dashboard.ListManagementActivity
 
 class ListActivity : AppCompatActivity() {
 
@@ -130,8 +131,15 @@ class ListActivity : AppCompatActivity() {
         val userRef = db.collection("Users").document(email)
         userRef.get().addOnSuccessListener { doc ->
             val name = doc.getString("name") ?: "Unknown"
-            val newItems = items.associateWith {
-                ShoppingItem(addedBy = name, addedAt = Timestamp.now(), important = false, pending = true)
+            val newItems = items.associate { itemName ->
+                val autoId = db.collection("shopping_lists").document().id // generate random ID
+                autoId to ShoppingItem(
+                    name = itemName,
+                    addedBy = name,
+                    addedAt = Timestamp.now(),
+                    important = false,
+                    pending = true
+                )
             }
             listId?.let { db.collection("shopping_lists").document(it)
                 .set(mapOf("items" to newItems), SetOptions.merge()) }
@@ -139,13 +147,13 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun sharePendingItems() {
-        listId?.let {
+        listId?.let { it ->
             db.collection("shopping_lists").document(it).get().addOnSuccessListener { doc ->
                 val items = (doc["items"] as? Map<*, *>)?.mapNotNull { entry ->
-                    val key = entry.key as? String ?: return@mapNotNull null
                     val map = entry.value as? Map<*, *> ?: return@mapNotNull null
                     val pending = map["pending"] as? Boolean != false
-                    if (pending) key else null
+                    val name = map["name"] as? String ?: return@mapNotNull null
+                    if (pending) name else null
                 } ?: emptyList()
                 if (items.isNotEmpty()) {
                     startActivity(Intent.createChooser(Intent().apply {
