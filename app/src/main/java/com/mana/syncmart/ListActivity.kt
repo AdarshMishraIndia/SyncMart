@@ -18,6 +18,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.core.content.ContextCompat
 import com.mana.syncmart.dashboard.ListManagementActivity
+import com.mana.syncmart.dashboard.ListManagementViewModel
+import androidx.lifecycle.ViewModelProvider
 
 class ListActivity : AppCompatActivity() {
 
@@ -26,6 +28,12 @@ class ListActivity : AppCompatActivity() {
     private var listId: String? = null
     private var currentListName = "Shopping List"
     private val menuDeleteId = 1001
+
+    override fun onResume() {
+        super.onResume()
+        // Check for notification when activity becomes visible
+        scheduleWhatsAppNotification()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -125,6 +133,23 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
+    private fun scheduleWhatsAppNotification() {
+        val prefs = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
+        val lastNotificationTime = prefs.getLong("last_whatsapp_notification", 0)
+        val currentTime = System.currentTimeMillis()
+        val tenMinutesInMillis = 10 * 60 * 1000L
+        val timeSinceLastNotification = currentTime - lastNotificationTime
+
+        if (lastNotificationTime == 0L || timeSinceLastNotification >= tenMinutesInMillis) {
+            // Update the timestamp immediately to prevent multiple rapid triggers
+            prefs.edit { putLong("last_whatsapp_notification", currentTime) }
+            
+            // Get the ViewModel and trigger the notification
+            val viewModel = ViewModelProvider(this)[ListManagementViewModel::class.java]
+            viewModel.sendWhatsAppNotification { }
+        }
+    }
+
     private fun addItemsToList(items: List<String>) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val email = user.email ?: return
@@ -133,9 +158,9 @@ class ListActivity : AppCompatActivity() {
         userRef.get().addOnSuccessListener { doc ->
             val name = doc.getString("name") ?: "Unknown"
 
-            val now = System.currentTimeMillis() // get current time in ms
+            val now = System.currentTimeMillis()
             val newItems = items.mapIndexed { index, itemName ->
-                val timestamp = Timestamp(Date(now + index * 1000L)) // add index seconds cumulatively
+                val timestamp = Timestamp(Date(now + index * 1000L))
                 val autoId = db.collection("shopping_lists").document().id
                 autoId to ShoppingItem(
                     name = itemName,
@@ -146,8 +171,14 @@ class ListActivity : AppCompatActivity() {
                 )
             }.toMap()
 
-            listId?.let { db.collection("shopping_lists").document(it)
-                .set(mapOf("items" to newItems), SetOptions.merge()) }
+            listId?.let { 
+                db.collection("shopping_lists").document(it)
+                    .set(mapOf("items" to newItems), SetOptions.merge())
+                    .addOnSuccessListener {
+                        // Schedule WhatsApp notification after successful item addition
+                        scheduleWhatsAppNotification()
+                    }
+            }
         }
     }
 

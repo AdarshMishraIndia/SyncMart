@@ -236,7 +236,7 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
 
     fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
         val apiUrl =
-            "https://bhashsms.com/api/sendmsg.php?user=Urban_BW&pass=ucbl123&sender=BUZWAP&phone=9040292104&text=dddd&priority=wa&stype=normal"
+            "https://bhashsms.com/api/sendmsg.php?user=Urban_BW&pass=ucbl123&sender=BUZWAP&phone=9668514995&text=dddd&priority=wa&stype=normal"
 
         viewModelScope.launch(Dispatchers.IO) {
             var wasSuccessful = false

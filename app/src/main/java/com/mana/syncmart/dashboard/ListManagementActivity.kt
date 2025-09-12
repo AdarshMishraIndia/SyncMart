@@ -37,6 +37,8 @@ import com.mana.syncmart.R
 import com.mana.syncmart.RegisterActivity
 import com.mana.syncmart.ShoppingList
 import com.mana.syncmart.auth.AuthActivity
+import android.os.Handler
+import android.os.Looper
 
 class ListManagementActivity : AppCompatActivity() {
     private lateinit var binding: ActivityListManagementBinding
@@ -55,6 +57,13 @@ class ListManagementActivity : AppCompatActivity() {
             setDisplayHomeAsUpEnabled(true)
             setHomeAsUpIndicator(R.drawable.ic_menu)
             title = "SyncMart"
+        }
+        
+        // Check if we need to trigger WhatsApp notification
+        if (intent?.getBooleanExtra("trigger_whatsapp", false) == true) {
+            Handler(Looper.getMainLooper()).postDelayed({
+                binding.textViewSendWapp.performClick()
+            }, 300) // Small delay to let the activity finish loading
         }
 
         // ✅ Register back press handler
@@ -326,7 +335,11 @@ class ListManagementActivity : AppCompatActivity() {
     private fun setupDragAndDrop() {
         val callback = object : ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0) {
             override fun onMove(rv: RecyclerView, vh: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder): Boolean {
-                listAdapter.moveItem(vh.adapterPosition, target.adapterPosition)
+                val fromPosition = vh.bindingAdapterPosition
+                val toPosition = target.bindingAdapterPosition
+                if (fromPosition != RecyclerView.NO_POSITION && toPosition != RecyclerView.NO_POSITION) {
+                    listAdapter.moveItem(fromPosition, toPosition)
+                }
                 return true
             }
             override fun onSwiped(vh: RecyclerView.ViewHolder, direction: Int) {}
