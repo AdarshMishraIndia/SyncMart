@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.io.IOException
@@ -222,16 +223,65 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
     fun deleteAccount() {
         val user = auth.currentUser ?: return
         val userEmail = user.email ?: return
-        db.collection("Users").document(userEmail).delete()
-            .addOnSuccessListener {
-                user.delete()
-                    .addOnSuccessListener {
-                        _toastMessage.value = "Account deleted successfully"
-                        _uiState.value = _uiState.value?.copy(navigateToRegister = true)
+        
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                // 1. Get all lists where user is owner or member
+                val ownedListsQuery = db.collection("shopping_lists")
+                    .whereEqualTo("owner", userEmail)
+                    .get()
+                    .await()
+                
+                val memberListsQuery = db.collection("shopping_lists")
+                    .whereArrayContains("accessEmails", userEmail)
+                    .get()
+                    .await()
+                
+                // 2. Process owned lists (transfer ownership or delete)
+                for (doc in ownedListsQuery.documents) {
+                    val accessEmails = doc.get("accessEmails") as? List<*>
+                    val newOwner = accessEmails?.firstOrNull { it is String && it != userEmail } as? String
+                    
+                    if (newOwner != null) {
+                        // Transfer ownership to the first user in accessEmails
+                        val updates = hashMapOf(
+                            "owner" to newOwner,
+                            "accessEmails" to accessEmails.filter { it != newOwner }
+                        )
+                        doc.reference.update(updates).await()
+                    } else {
+                        // No other owners, delete the list
+                        doc.reference.delete().await()
                     }
-                    .addOnFailureListener { _toastMessage.value = "Failed to delete authentication account" }
+                }
+                
+                // 3. Process member lists (remove user from accessEmails)
+                for (doc in memberListsQuery.documents) {
+                    val accessEmails = (doc.get("accessEmails") as? List<*>)?.filterIsInstance<String>() ?: continue
+                    val updatedAccessEmails = accessEmails.filter { it != userEmail }
+                    
+                    if (updatedAccessEmails != accessEmails) {
+                        doc.reference.update("accessEmails", updatedAccessEmails).await()
+                    }
+                }
+                
+                // 4. Delete user document and auth account
+                db.collection("Users").document(userEmail).delete().await()
+                
+                // 5. Delete the auth account
+                user.delete().await()
+                
+                withContext(Dispatchers.Main) {
+                    _toastMessage.value = "Account deleted successfully"
+                    _uiState.value = _uiState.value?.copy(navigateToAuth = true)
+                }
+                
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _toastMessage.value = "Error deleting account: ${e.message}"
+                }
             }
-            .addOnFailureListener { _toastMessage.value = "Failed to delete Firestore account" }
+        }
     }
 
     fun sendWhatsAppNotification(success: (Boolean) -> Unit) {
