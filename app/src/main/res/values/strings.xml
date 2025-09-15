@@ -37,6 +37,10 @@
     <string name="add_friend">Add Friend</string>
     <string name="lists">Lists</string>
 
+    <!-- Notifications -->
+    <string name="notification_channel_id">syncmart_notification_channel</string>
+    <string name="notification_channel_name">SyncMart Notifications</string>
+    <string name="notification_channel_description">SyncMart app notifications</string>
 
     <!-- Firebase Configurations -->
     <string name="firebase_api_key">YOUR_FIREBASE_API_KEY_HERE</string>

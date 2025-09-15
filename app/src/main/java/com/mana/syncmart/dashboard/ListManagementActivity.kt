@@ -6,11 +6,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.LayoutInflater
-import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -22,12 +24,6 @@ import com.airbnb.lottie.LottieAnimationView
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.mana.syncmart.databinding.ActivityListManagementBinding
-import com.mana.syncmart.databinding.DialogConfirmBinding
-import com.mana.syncmart.databinding.DialogModifyListBinding
-import android.widget.FrameLayout
-import android.view.WindowManager
-import androidx.activity.OnBackPressedCallback
 import com.mana.syncmart.Friend
 import com.mana.syncmart.FriendActivity
 import com.mana.syncmart.FriendSelectionAdapter
@@ -37,8 +33,9 @@ import com.mana.syncmart.R
 import com.mana.syncmart.RegisterActivity
 import com.mana.syncmart.ShoppingList
 import com.mana.syncmart.auth.AuthActivity
-import android.os.Handler
-import android.os.Looper
+import com.mana.syncmart.databinding.ActivityListManagementBinding
+import com.mana.syncmart.databinding.DialogConfirmBinding
+import com.mana.syncmart.databinding.DialogModifyListBinding
 
 class ListManagementActivity : AppCompatActivity() {
     private lateinit var binding: ActivityListManagementBinding
@@ -59,12 +56,22 @@ class ListManagementActivity : AppCompatActivity() {
             title = "SyncMart"
         }
         
-        // Check if we need to trigger WhatsApp notification
-        if (intent?.getBooleanExtra("trigger_whatsapp", false) == true) {
-            Handler(Looper.getMainLooper()).postDelayed({
-                binding.textViewSendWapp.performClick()
-            }, 300) // Small delay to let the activity finish loading
+        // Handle notification intent
+        if (intent?.getBooleanExtra("from_notification", false) == true) {
+            // If there's a target fragment specified in the notification
+            intent.getStringExtra("target_fragment")?.let { target ->
+                when (target) {
+                    // Add more cases here for different fragments if needed
+                    "friends" -> {
+                        // Navigate to friends fragment
+                        startActivity(Intent(this, FriendActivity::class.java))
+                    }
+                    // Add more targets as needed
+                }
+            }
         }
+        
+        // WhatsApp notification can be triggered manually via the send button
 
         // ✅ Register back press handler
         onBackPressedDispatcher.addCallback(this,
@@ -291,7 +298,22 @@ class ListManagementActivity : AppCompatActivity() {
         dialogBinding.listViewMembers.visibility = if (isEmpty) View.GONE else View.VISIBLE
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean = true
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        
+        // Handle notification intents when activity is brought to foreground
+        if (intent.getBooleanExtra("from_notification", false)) {
+            intent.getStringExtra("target_fragment")?.let { target ->
+                when (target) {
+                    "friends" -> {
+                        startActivity(Intent(this, FriendActivity::class.java))
+                    }
+                    // Add more targets as needed
+                }
+            }
+        }
+    }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {

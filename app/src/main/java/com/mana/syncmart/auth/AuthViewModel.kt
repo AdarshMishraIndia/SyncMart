@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.messaging.FirebaseMessaging
+import com.mana.syncmart.fcm.SyncMartMessagingService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -65,10 +67,15 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             if (!document.exists()) {
                 val newUser = hashMapOf(
                     "name" to name,
-                    "friendsMap" to emptyList<String>()
+                    "friendsMap" to emptyList<String>(),
+                    "fcmTokens" to emptyList<String>()
                 )
                 userDocRef.set(newUser).await()
             }
+            
+            // Get FCM token and update it in Firestore
+            val token = FirebaseMessaging.getInstance().token.await()
+            SyncMartMessagingService().updateTokenInFirestore(email, token)
             
             _uiState.value = _uiState.value.copy(
                 isAuthenticated = true,

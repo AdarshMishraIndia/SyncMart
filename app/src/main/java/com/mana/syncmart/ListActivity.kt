@@ -6,20 +6,20 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.edit
+import com.google.android.material.tabs.TabLayoutMediator
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.mana.syncmart.dashboard.ListManagementActivity
 import com.mana.syncmart.databinding.ActivityListBinding
 import com.mana.syncmart.databinding.DialogAddItemsBinding
-import com.google.android.material.tabs.TabLayoutMediator
 import java.text.SimpleDateFormat
-import java.util.*
-import androidx.core.content.ContextCompat
-import com.mana.syncmart.dashboard.ListManagementActivity
-import com.mana.syncmart.dashboard.ListManagementViewModel
-import androidx.lifecycle.ViewModelProvider
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class ListActivity : AppCompatActivity() {
 
@@ -29,25 +29,24 @@ class ListActivity : AppCompatActivity() {
     private var currentListName = "Shopping List"
     private val menuDeleteId = 1001
 
-    override fun onResume() {
-        super.onResume()
-        // Check for notification when activity becomes visible
-        scheduleWhatsAppNotification()
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityListBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
 
-        listId = intent.getStringExtra("LIST_ID")
         binding.toolbar.title = "Loading..."
-        listId?.let { loadListData(it) } ?: fallbackSetup()
-
+        
+        // Process the initial intent
+        processIntent(intent)
+        
         binding.addElementButton.setOnClickListener { showAddItemsDialog() }
         binding.shareListButton.setOnClickListener { sharePendingItems() }
         checkAndClearFinishedItems()
+        
+        // Set up back button to go to ListManagementActivity when coming from notification
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        supportActionBar?.setDisplayShowHomeEnabled(true)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
@@ -58,6 +57,27 @@ class ListActivity : AppCompatActivity() {
         })
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        processIntent(intent)
+    }
+    
+    private fun processIntent(intent: Intent) {
+        // Try to get list ID from either extra
+        val newListId = intent.getStringExtra("LIST_ID") ?: intent.getStringExtra("list_id")
+        
+        if (!newListId.isNullOrEmpty()) {
+            // Only update if this is a different list
+            if (newListId != listId) {
+                listId = newListId
+                loadListData(newListId)
+            }
+        } else if (listId == null) {
+            fallbackSetup()
+        }
+    }
+    
     private fun loadListData(id: String) {
         db.collection("shopping_lists").document(id).get()
             .addOnSuccessListener { doc ->
@@ -133,23 +153,6 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
-    private fun scheduleWhatsAppNotification() {
-        val prefs = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-        val lastNotificationTime = prefs.getLong("last_whatsapp_notification", 0)
-        val currentTime = System.currentTimeMillis()
-        val tenMinutesInMillis = 10 * 60 * 1000L
-        val timeSinceLastNotification = currentTime - lastNotificationTime
-
-        if (lastNotificationTime == 0L || timeSinceLastNotification >= tenMinutesInMillis) {
-            // Update the timestamp immediately to prevent multiple rapid triggers
-            prefs.edit { putLong("last_whatsapp_notification", currentTime) }
-            
-            // Get the ViewModel and trigger the notification
-            val viewModel = ViewModelProvider(this)[ListManagementViewModel::class.java]
-            viewModel.sendWhatsAppNotification { }
-        }
-    }
-
     private fun addItemsToList(items: List<String>) {
         val user = FirebaseAuth.getInstance().currentUser ?: return
         val email = user.email ?: return
@@ -175,8 +178,7 @@ class ListActivity : AppCompatActivity() {
                 db.collection("shopping_lists").document(it)
                     .set(mapOf("items" to newItems), SetOptions.merge())
                     .addOnSuccessListener {
-                        // Schedule WhatsApp notification after successful item addition
-                        scheduleWhatsAppNotification()
+                        // Item added successfully
                     }
             }
         }
