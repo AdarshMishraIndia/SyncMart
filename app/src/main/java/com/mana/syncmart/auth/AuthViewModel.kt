@@ -11,12 +11,15 @@ import com.google.firebase.messaging.FirebaseMessaging
 import com.mana.syncmart.fcm.SyncMartMessagingService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
+
     private val _uiState = MutableStateFlow(AuthUiState())
-    val uiState: StateFlow<AuthUiState> = _uiState
+    val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -26,36 +29,39 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun checkCurrentUser() {
-        _uiState.value = _uiState.value.copy(
-            isAuthenticated = auth.currentUser != null
-        )
+        val user = auth.currentUser
+        _uiState.update { it.copy(isAuthenticated = user != null) }
+        if (user != null) {
+            Log.d("AuthViewModel", "User already authenticated: ${user.email}")
+        }
+    }
+
+    fun setLoading(isLoading: Boolean) {
+        _uiState.update { it.copy(isLoading = isLoading) }
+    }
+
+    fun setError(message: String?) {
+        _uiState.update { it.copy(errorMessage = message) }
     }
 
     fun signInWithGoogle(idToken: String) = viewModelScope.launch {
+        setLoading(true)
         try {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            
             val credential = GoogleAuthProvider.getCredential(idToken, null)
             val authResult = auth.signInWithCredential(credential).await()
-            
-            authResult.user?.let { user ->
-                if (user.email != null) {
-                    checkAndRegisterFirestoreUser(user.email!!, user.displayName ?: "")
-                } else {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        errorMessage = "User email is null"
-                    )
-                    Log.e("AuthViewModel", "Signed in user has no email")
-                }
-            } ?: throw Exception("Authentication failed: No user returned")
-            
+            val user = authResult.user ?: throw Exception("Authentication failed: No user returned")
+
+            user.email?.let { email ->
+                checkAndRegisterFirestoreUser(email, user.displayName ?: "")
+            } ?: run {
+                setError("User email is null after successful authentication.")
+                Log.e("AuthViewModel", "Signed in user has no email")
+            }
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                errorMessage = "Authentication failed: ${e.message}"
-            )
+            setError("Google sign in failed: ${e.message}")
             Log.e("AuthViewModel", "Google sign in failed", e)
+        } finally {
+            setLoading(false)
         }
     }
 
@@ -63,7 +69,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val userDocRef = firestore.collection("Users").document(email)
             val document = userDocRef.get().await()
-            
+
             if (!document.exists()) {
                 val newUser = hashMapOf(
                     "name" to name,
@@ -71,26 +77,22 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     "fcmTokens" to emptyList<String>()
                 )
                 userDocRef.set(newUser).await()
+                Log.d("AuthViewModel", "New user registered in Firestore: $email")
             }
-            
+
             // Get FCM token and update it in Firestore
             val token = FirebaseMessaging.getInstance().token.await()
             SyncMartMessagingService().updateTokenInFirestore(email, token)
-            
-            _uiState.value = _uiState.value.copy(
-                isAuthenticated = true,
-                isLoading = false
-            )
+            Log.d("AuthViewModel", "FCM token updated for user: $email")
+
+            _uiState.update { it.copy(isAuthenticated = true) }
         } catch (e: Exception) {
-            _uiState.value = _uiState.value.copy(
-                isLoading = false,
-                errorMessage = "Failed to register user: ${e.message}"
-            )
+            setError("Failed to register user in Firestore: ${e.message}")
             Log.e("AuthViewModel", "Firestore operation failed", e)
         }
     }
 
     fun clearError() {
-        _uiState.value = _uiState.value.copy(errorMessage = null)
+        _uiState.update { it.copy(errorMessage = null) }
     }
 }

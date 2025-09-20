@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
-import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -17,6 +16,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.airbnb.lottie.LottieAnimationView
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.material.snackbar.Snackbar
 import com.mana.syncmart.R
 import com.mana.syncmart.dashboard.ListManagementActivity
 import kotlinx.coroutines.flow.collectLatest
@@ -24,123 +24,147 @@ import kotlinx.coroutines.launch
 
 class AuthActivity : AppCompatActivity() {
 
-    private val viewModel: AuthViewModel by viewModels { AuthViewModelFactory(application) }
+    private val authViewModel: AuthViewModel by viewModels { AuthViewModelFactory(application) }
     private val credentialManager by lazy { CredentialManager.create(this) }
-    private var loadingDialog: AlertDialog? = null
+    private var progressDialog: AlertDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_auth)
 
-        // Set up UI listeners
-        findViewById<android.view.View>(R.id.google_auth_button).setOnClickListener {
-            beginGoogleSignIn()
-        }
+        setupListeners()
+        observeViewModelState()
+    }
 
-        // Observe ViewModel state
+    private fun setupListeners() {
+        findViewById<android.view.View>(R.id.google_auth_button).setOnClickListener {
+            startGoogleSignInFlow()
+        }
+    }
+
+    private fun observeViewModelState() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.uiState.collectLatest { state ->
-                    updateUi(state)
+                authViewModel.uiState.collectLatest { state ->
+                    handleUiState(state)
                 }
             }
         }
     }
 
-    private fun updateUi(state: AuthUiState) {
-        // Handle loading state
+    private fun handleUiState(state: AuthUiState) {
         if (state.isLoading) {
-            showLoadingDialog()
+            showProgressDialog()
         } else {
-            hideLoadingDialog()
+            hideProgressDialog()
         }
 
-        // Handle authentication state
         if (state.isAuthenticated) {
-            goToListManagement()
+            navigateToDashboard()
         }
 
-        // Show error message if any
         state.errorMessage?.let { error ->
-            Log.e("AuthActivity", error)
-            viewModel.clearError()
+            Log.e("AuthActivity", "UI State Error: $error")
+            showErrorMessage(error)
+            authViewModel.clearError()
         }
     }
 
-    private fun showLoadingDialog() {
-        if (loadingDialog?.isShowing == true) return
+    private fun showProgressDialog() {
+        if (progressDialog?.isShowing == true) return
 
         val dialogView = LayoutInflater.from(this).inflate(R.layout.layout_loading, null)
-        val animationView = dialogView.findViewById<LottieAnimationView>(R.id.loading_animation)
-        animationView.playAnimation()
+        dialogView.findViewById<LottieAnimationView>(R.id.loading_animation)?.playAnimation()
 
-        loadingDialog = AlertDialog.Builder(this)
+        progressDialog = AlertDialog.Builder(this)
             .setView(dialogView)
             .setCancelable(false)
-            .create()
-
-        loadingDialog?.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        loadingDialog?.show()
-
-        val widthPx = resources.getDimensionPixelSize(R.dimen.loading_dialog_width)
-        loadingDialog?.window?.setLayout(widthPx, WindowManager.LayoutParams.WRAP_CONTENT)
+            .create().apply {
+                window?.setBackgroundDrawableResource(android.R.color.transparent)
+                window?.setLayout(resources.getDimensionPixelSize(R.dimen.loading_dialog_width), -2)
+                show()
+            }
     }
 
-    private fun hideLoadingDialog() {
-        loadingDialog?.dismiss()
-        loadingDialog = null
+    private fun hideProgressDialog() {
+        progressDialog?.dismiss()
+        progressDialog = null
     }
 
-    private fun beginGoogleSignIn() {
+    private fun showErrorMessage(message: String) {
+        // Use a more robust way to find the root view
+        val rootView = window.decorView.findViewById<android.view.View>(android.R.id.content)
+        Snackbar.make(rootView, message, Snackbar.LENGTH_LONG)
+            .show()
+        Log.e("AuthActivity", "Error displayed: $message")
+    }
+
+    private fun startGoogleSignInFlow() {
+        val webClientId = getString(R.string.default_web_client_id)
+        if (webClientId.isBlank() || webClientId == "YOUR_WEB_CLIENT_ID") {
+            Log.e("AuthActivity", "Invalid web client ID. Please configure it in strings.xml")
+            showErrorMessage("Authentication not configured properly.")
+            return
+        }
+
+        val getCredentialRequest = createGetCredentialRequest(webClientId)
+        lifecycleScope.launch {
+            fetchCredentialAndAuthenticate(getCredentialRequest)
+        }
+    }
+
+    private fun createGetCredentialRequest(webClientId: String): GetCredentialRequest {
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
-            .setServerClientId(getString(R.string.default_web_client_id))
+            .setServerClientId(webClientId)
             .build()
 
-        val request = GetCredentialRequest.Builder()
+        return GetCredentialRequest.Builder()
             .addCredentialOption(googleIdOption)
             .build()
+    }
 
-        lifecycleScope.launch {
-            try {
-                Log.d("AuthActivity", "Starting Google Sign-In")
-                showLoadingDialog()
+    private suspend fun fetchCredentialAndAuthenticate(request: GetCredentialRequest) {
+        try {
+            authViewModel.setLoading(true)
+            val result = credentialManager.getCredential(
+                request = request,
+                context = this@AuthActivity
+            )
+            handleSignInResult(result.credential)
+        } catch (e: GetCredentialException) {
+            val errorMessage = e.errorMessage ?: "Authentication failed: Unknown error"
+            Log.e("AuthActivity", "Credential fetch failed: $errorMessage", e)
+            authViewModel.setError(errorMessage as String?)
+        } catch (e: Exception) {
+            Log.e("AuthActivity", "Unexpected error during sign-in", e)
+            authViewModel.setError("An unexpected error occurred. Please try again.")
+        } finally {
+            authViewModel.setLoading(false)
+        }
+    }
 
-                val result = credentialManager.getCredential(
-                    request = request,
-                    context = this@AuthActivity
-                )
-
-                Log.d("AuthActivity", "Credential result received: ${result.credential.javaClass.name}")
-                hideLoadingDialog()
-
-                val googleIdTokenCredential = result.credential as? GoogleIdTokenCredential
-                if (googleIdTokenCredential == null) {
-                    Log.e("AuthActivity", "Credential is NOT GoogleIdTokenCredential -> ${result.credential}")
-                }
-
-                val idToken = googleIdTokenCredential?.idToken
-                Log.d("AuthActivity", "ID token present? ${!idToken.isNullOrEmpty()}")
-
-                if (!idToken.isNullOrEmpty()) {
-                    Log.d("AuthActivity", "ID token length: ${idToken.length}")
-                    viewModel.signInWithGoogle(idToken)
+    private fun handleSignInResult(credential: androidx.credentials.Credential) {
+        when (credential) {
+            is GoogleIdTokenCredential -> {
+                val idToken = credential.idToken
+                if (idToken.isNotEmpty()) {
+                    Log.d("AuthActivity", "Successfully received ID token. Authenticating with backend...")
+                    authViewModel.signInWithGoogle(idToken)
                 } else {
-                    Log.e("AuthActivity", "Missing ID token - cannot continue sign-in")
-                    // Optionally show a toast or snackbar so user knows it failed
+                    Log.e("AuthActivity", "Empty ID token received")
+                    authViewModel.setError("Authentication failed: Empty token received")
                 }
-            } catch (e: GetCredentialException) {
-                hideLoadingDialog()
-                Log.e("AuthActivity", "Credential fetch failed: ${e.errorMessage}", e)
-            } catch (e: Exception) {
-                hideLoadingDialog()
-                Log.e("AuthActivity", "Unexpected error during sign-in: ${e.localizedMessage}", e)
+            }
+            else -> {
+                Log.e("AuthActivity", "Unexpected credential type: ${credential.javaClass.name}")
+                authViewModel.setError("Authentication failed: Unsupported credential type")
             }
         }
     }
 
-
-    private fun goToListManagement() {
+    private fun navigateToDashboard() {
+        Log.d("AuthActivity", "Authentication successful. Navigating to dashboard.")
         startActivity(Intent(this, ListManagementActivity::class.java))
         finish()
     }
