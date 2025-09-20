@@ -7,35 +7,6 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:61170465939:android:ec84c42814c7cde22aa166",
-        "android_client_info": {
-          "package_name": "com.kaak.sureattend"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "61170465939-09n8pu8aec1g47ng6qn5uk72a6rnnkg6.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyDDg2PtTzetXLD1w_Yy_SrYc9otTFmFBfI"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "61170465939-09n8pu8aec1g47ng6qn5uk72a6rnnkg6.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
         "mobilesdk_app_id": "1:61170465939:android:907bded8fe67a3252aa166",
         "android_client_info": {
           "package_name": "com.mana.syncmart"

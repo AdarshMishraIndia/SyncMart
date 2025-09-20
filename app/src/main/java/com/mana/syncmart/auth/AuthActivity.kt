@@ -103,30 +103,42 @@ class AuthActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
+                Log.d("AuthActivity", "Starting Google Sign-In")
                 showLoadingDialog()
+
                 val result = credentialManager.getCredential(
                     request = request,
                     context = this@AuthActivity
                 )
-                
-                // Hide loader for account picker
+
+                Log.d("AuthActivity", "Credential result received: ${result.credential.javaClass.name}")
                 hideLoadingDialog()
-                
+
                 val googleIdTokenCredential = result.credential as? GoogleIdTokenCredential
+                if (googleIdTokenCredential == null) {
+                    Log.e("AuthActivity", "Credential is NOT GoogleIdTokenCredential -> ${result.credential}")
+                }
+
                 val idToken = googleIdTokenCredential?.idToken
+                Log.d("AuthActivity", "ID token present? ${!idToken.isNullOrEmpty()}")
 
                 if (!idToken.isNullOrEmpty()) {
+                    Log.d("AuthActivity", "ID token length: ${idToken.length}")
                     viewModel.signInWithGoogle(idToken)
                 } else {
-                    Log.e("AuthActivity", "Missing ID token in GoogleIdTokenCredential")
+                    Log.e("AuthActivity", "Missing ID token - cannot continue sign-in")
+                    // Optionally show a toast or snackbar so user knows it failed
                 }
             } catch (e: GetCredentialException) {
-                Log.e("AuthActivity", "Credential fetch failed", e)
+                hideLoadingDialog()
+                Log.e("AuthActivity", "Credential fetch failed: ${e.errorMessage}", e)
             } catch (e: Exception) {
-                Log.e("AuthActivity", "Unexpected error during sign-in", e)
+                hideLoadingDialog()
+                Log.e("AuthActivity", "Unexpected error during sign-in: ${e.localizedMessage}", e)
             }
         }
     }
+
 
     private fun goToListManagement() {
         startActivity(Intent(this, ListManagementActivity::class.java))

@@ -47,7 +47,7 @@
     <string name="firebase_database_url">YOUR_FIREBASE_DATABASE_URL_HERE</string>
 
     <!-- Google -->
-    <string name="default_web_client_id">61170465939-iaj5c6g4nk7iufn8hb8uec7vhlbv4m26.apps.googleusercontent.com</string>
+    <string name="default_web_client_id">61170465939-09n8pu8aec1g47ng6qn5uk72a6rnnkg6.apps.googleusercontent.com</string>
 
 </resources>
 

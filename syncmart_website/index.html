@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SyncMart - Shopping Lists Made Simple</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="stylesheet" href="styles/auth.css">
+    <link rel="stylesheet" href="styles/lists.css">
+    <link rel="stylesheet" href="styles/components.css">
+    <link href="https://fonts.googleapis.com/css2?family=Notable&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Firebase v9 compat (for v8-style code) -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loading-content">
+            <div class="loading-logo">
+                <img src="assets/syncmart-logo.svg" alt="SyncMart" class="logo-image">
+            </div>
+            <div class="loading-spinner"></div>
+            <p class="loading-text">Loading SyncMart...</p>
+        </div>
+    </div>
+
+    <!-- Auth Screen -->
+    <div id="authScreen" class="auth-screen hidden">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1 class="auth-title">Welcome to SyncMart</h1>
+                <div class="auth-logo">
+                    <img src="assets/syncmart-logo.svg" alt="SyncMart Logo" class="logo-image">
+                </div>
+            </div>
+            <div class="auth-actions">
+                <button id="googleSignInBtn" class="google-signin-btn">
+                    <i class="fab fa-google"></i>
+                    <span>Sign in with Google</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Screen -->
+    <div id="mainApp" class="main-app hidden">
+        <!-- Navigation Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <button id="menuBtn" class="menu-btn">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <h1 class="app-title">SyncMart</h1>
+                <div class="user-welcome">
+                    <span id="userName">Welcome, User</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Drawer -->
+        <div id="navDrawer" class="nav-drawer">
+            <div class="nav-header">
+                <img src="assets/syncmart-logo.svg" alt="SyncMart" class="nav-logo">
+                <h3>SyncMart</h3>
+            </div>
+            <nav class="nav-menu">
+                <button class="nav-item" data-action="friends">
+                    <i class="fas fa-users"></i>
+                    <span>Friends</span>
+                </button>
+                <button class="nav-item" data-action="edit-profile">
+                    <i class="fas fa-user-edit"></i>
+                    <span>Edit Profile</span>
+                </button>
+                <button class="nav-item" data-action="logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Logout</span>
+                </button>
+                <button class="nav-item" data-action="delete-account">
+                    <i class="fas fa-trash"></i>
+                    <span>Delete Account</span>
+                </button>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Lists Management -->
+            <div id="listsSection" class="lists-section">
+                <div class="lists-header">
+                    <h2>My Shopping Lists</h2>
+                    <button id="addListBtn" class="add-btn">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </div>
+                
+                <div id="listsContainer" class="lists-container">
+                    <!-- Lists will be populated here -->
+                </div>
+
+                <div id="emptyState" class="empty-state hidden">
+                    <i class="fas fa-shopping-cart"></i>
+                    <p>No shopping lists yet. Create your first list!</p>
+                </div>
+
+                <div class="whatsapp-section">
+                    <button id="sendWhatsAppBtn" class="whatsapp-btn">
+                        <i class="fab fa-whatsapp"></i>
+                        Send WAPP
+                    </button>
+                </div>
+            </div>
+
+            <!-- List Detail View -->
+            <div id="listDetailSection" class="list-detail-section hidden">
+                <div class="list-detail-header">
+                    <button id="backToListBtn" class="back-btn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2 id="listDetailTitle">Shopping List</h2>
+                    <div class="list-actions">
+                        <button id="addItemsBtn" class="action-btn">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button id="shareListBtn" class="action-btn">
+                            <i class="fas fa-share"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="list-tabs">
+                    <button class="tab-btn active" data-tab="pending">
+                        <span>Pending</span>
+                        <span id="pendingCount" class="tab-count">0</span>
+                    </button>
+                    <button class="tab-btn" data-tab="finished">
+                        <span>Finished</span>
+                        <span id="finishedCount" class="tab-count">0</span>
+                    </button>
+                </div>
+
+                <div class="list-content">
+                    <div id="pendingItems" class="items-container active">
+                        <!-- Pending items will be populated here -->
+                    </div>
+                    <div id="finishedItems" class="items-container">
+                        <!-- Finished items will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Friends Management -->
+            <div id="friendsSection" class="friends-section hidden">
+                <div class="friends-header">
+                    <button id="backFromFriendsBtn" class="back-btn">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <h2>Friends</h2>
+                    <button id="addFriendBtn" class="add-btn">
+                        <i class="fas fa-user-plus"></i>
+                    </button>
+                </div>
+                
+                <div id="friendsContainer" class="friends-container">
+                    <!-- Friends will be populated here -->
+                </div>
+
+                <div id="friendsEmptyState" class="empty-state hidden">
+                    <i class="fas fa-users"></i>
+                    <p>No friends added yet. Add your first friend!</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modalOverlay" class="modal-overlay hidden"></div>
+
+    <!-- Add/Edit List Modal -->
+    <div id="listModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="listModalTitle">Create New List</h3>
+                <button class="modal-close" data-modal="listModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="listNameInput">List Name</label>
+                    <input type="text" id="listNameInput" placeholder="Enter list name">
+                </div>
+                <div class="form-group">
+                    <label>Share with Friends</label>
+                    <div id="friendsSelection" class="friends-selection">
+                        <!-- Friends checkboxes will be populated here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" data-modal="listModal">Cancel</button>
+                <button id="saveListBtn" class="btn-primary">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Items Modal -->
+    <div id="itemsModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Items</h3>
+                <button class="modal-close" data-modal="itemsModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="itemsInput">Items (one per line)</label>
+                    <textarea id="itemsInput" placeholder="Enter items, one per line" rows="6"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" data-modal="itemsModal">Cancel</button>
+                <button id="addItemsSaveBtn" class="btn-primary">Add Items</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Friend Modal -->
+    <div id="friendModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Friend</h3>
+                <button class="modal-close" data-modal="friendModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="friendEmailInput">Friend's Email</label>
+                    <input type="email" id="friendEmailInput" placeholder="Enter friend's email">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" data-modal="friendModal">Cancel</button>
+                <button id="addFriendSaveBtn" class="btn-primary">Add Friend</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="confirmTitle">Confirm Action</h3>
+                <button class="modal-close" data-modal="confirmModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage">Are you sure you want to perform this action?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" data-modal="confirmModal">Cancel</button>
+                <button id="confirmActionBtn" class="btn-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/lists.js"></script>
+    <script src="js/friends.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

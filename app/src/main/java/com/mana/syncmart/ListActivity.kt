@@ -154,33 +154,34 @@ class ListActivity : AppCompatActivity() {
     }
 
     private fun addItemsToList(items: List<String>) {
-        val user = FirebaseAuth.getInstance().currentUser ?: return
-        val email = user.email ?: return
-        val userRef = db.collection("Users").document(email)
+        if (items.isEmpty()) return
 
-        userRef.get().addOnSuccessListener { doc ->
-            val name = doc.getString("name") ?: "Unknown"
+        val user = FirebaseAuth.getInstance().currentUser
+        val userEmail = user?.email ?: "unknown"
 
-            val now = System.currentTimeMillis()
-            val newItems = items.mapIndexed { index, itemName ->
-                val timestamp = Timestamp(Date(now + index * 1000L))
-                val autoId = db.collection("shopping_lists").document().id
-                autoId to ShoppingItem(
-                    name = itemName,
-                    addedBy = name,
-                    addedAt = timestamp,
-                    important = false,
-                    pending = true
-                )
-            }.toMap()
+        val sanitizedItems = items.map { it.trim() }.filter { it.isNotBlank() }
+        if (sanitizedItems.isEmpty()) return
 
-            listId?.let { 
-                db.collection("shopping_lists").document(it)
-                    .set(mapOf("items" to newItems), SetOptions.merge())
-                    .addOnSuccessListener {
-                        // Item added successfully
-                    }
-            }
+        val now = System.currentTimeMillis()
+        val newItems = sanitizedItems.mapIndexed { index, itemName ->
+            val timestamp = Timestamp(Date(now + index * 1000L))
+            val autoId = db.collection("shopping_lists").document().id
+            autoId to ShoppingItem(
+                name = itemName,
+                addedBy = userEmail,  // Using sanitized email
+                addedAt = timestamp,
+                important = false,
+                pending = true
+            )
+        }.toMap()
+
+        // Update Firestore
+        listId?.let { id ->
+            db.collection("shopping_lists").document(id)
+                .set(mapOf("items" to newItems), SetOptions.merge())
+                .addOnFailureListener { e ->
+                    // Consider showing an error message to the user
+                }
         }
     }
 
