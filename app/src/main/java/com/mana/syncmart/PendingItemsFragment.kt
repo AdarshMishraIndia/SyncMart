@@ -13,7 +13,6 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.airbnb.lottie.LottieAnimationView
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.FragmentPendingItemsBinding
@@ -123,7 +122,7 @@ class PendingItemsFragment : Fragment() {
 
                     val name = value["name"] as? String ?: ""
                     val addedBy = value["addedBy"] as? String ?: ""
-                    val addedAt = value["addedAt"] as? Timestamp
+                    val addedAt = value["addedAt"] as? String ?: ""
                     val important = value["important"] as? Boolean == true
                     val pending = value["pending"] as? Boolean != false
 
@@ -164,34 +163,28 @@ class PendingItemsFragment : Fragment() {
             return
         }
 
-        val currentTime = Timestamp.now()
+        // Format current time in ISO 8601 format with milliseconds and 'Z' timezone
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
+        val currentTimeFormatted = sdf.format(Date())
 
-        // Fetch current user name from Firestore
-        db.collection("Users").document(currentUserEmail).get()
-            .addOnSuccessListener { document ->
-                val currentUserName = document.getString("name") ?: "Unknown"
-
-                // Update item fields
-                listId?.let { listId ->
-                    db.collection("shopping_lists").document(listId)
-                        .update(
-                            mapOf(
-                                "items.$itemName.pending" to false,
-                                "items.$itemName.addedAt" to currentTime,
-                                "items.$itemName.addedBy" to currentUserName
-                            )
-                        )
-                        .addOnSuccessListener {
-                            adapter.removeItem(itemName)
-                        }
-                        .addOnFailureListener {
-                            showToast("Failed to mark item finished")
-                        }
+        // Update item fields with current user's email
+        listId?.let { listId ->
+            db.collection("shopping_lists").document(listId)
+                .update(
+                    mapOf(
+                        "items.$itemName.pending" to false,
+                        "items.$itemName.addedAt" to currentTimeFormatted,
+                        "items.$itemName.addedBy" to currentUserEmail
+                    )
+                )
+                .addOnSuccessListener {
+                    adapter.removeItem(itemName)
                 }
-            }
-            .addOnFailureListener {
-                showToast("Failed to fetch user info")
-            }
+                .addOnFailureListener {
+                    showToast("Failed to mark item finished")
+                }
+        }
     }
 
 
@@ -284,22 +277,39 @@ class PendingItemsFragment : Fragment() {
     }
 
 
+    @SuppressLint("SetTextI18n")
     private fun showItemInfoDialog(item: ShoppingItem, itemName: String) {
         val dialogBinding = LayoutMetadataBinding.inflate(layoutInflater)
         dialogBinding.nameValue.text = itemName
-        dialogBinding.addedByValue.text = item.addedBy
-        dialogBinding.addedAtValue.text = item.addedAt?.let { formatTimestamp(it) } ?: "Unknown"
+        
+        // Set loading text initially
+        dialogBinding.addedByValue.text = "Loading..."
+        
+        // Fetch user details from Firestore
+        val addedByEmail = item.addedBy
+        if (addedByEmail.isNotEmpty()) {
+            db.collection("Users")
+                .document(addedByEmail)
+                .get()
+                .addOnSuccessListener { document ->
+                    val username = document.getString("name") ?: addedByEmail
+                    dialogBinding.addedByValue.text = username
+                }
+                .addOnFailureListener {
+                    // If there's an error, just show the email
+                    dialogBinding.addedByValue.text = addedByEmail
+                }
+        } else {
+            dialogBinding.addedByValue.text = "Unknown"
+        }
+        
+        dialogBinding.addedAtValue.text = item.formattedDate
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogBinding.root)
             .create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
-    }
-
-    private fun formatTimestamp(timestamp: Timestamp): String {
-        val date = timestamp.toDate()
-        return SimpleDateFormat("h:mm a, d MMM yyyy", Locale.getDefault()).format(date)
     }
 
     override fun onDestroyView() {

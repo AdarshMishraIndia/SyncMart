@@ -1,6 +1,7 @@
 package com.mana.syncmart
 
 import android.annotation.SuppressLint
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -9,7 +10,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.mana.syncmart.databinding.ListElementRecyclerLayoutBinding
-import android.view.Gravity
 
 class ItemAdapter(
     var items: MutableList<Pair<String, ShoppingItem>>,
@@ -42,7 +42,7 @@ class ItemAdapter(
         holder.itemName.text = item.name
 
         // Show formatted addedAt in the lower right
-        holder.itemAddedAt.text = item.addedAt?.let { formatTimestamp(it) } ?: "Unknown"
+        holder.itemAddedAt.text = item.formattedDate
 
         // Star button
         holder.btnStar.setImageResource(if (item.important) R.drawable.ic_star_important else R.drawable.ic_star)
@@ -150,11 +150,5 @@ class ItemAdapter(
             removeItem(itemId)
         }
         clearSelection()
-    }
-
-    private fun formatTimestamp(timestamp: com.google.firebase.Timestamp): String {
-        val date = timestamp.toDate()
-        val formatter = java.text.SimpleDateFormat("h:mm a, d MMM yyyy", java.util.Locale.getDefault())
-        return formatter.format(date)
     }
 }

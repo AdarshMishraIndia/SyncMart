@@ -9,7 +9,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.google.android.material.tabs.TabLayoutMediator
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
@@ -20,6 +19,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 class ListActivity : AppCompatActivity() {
 
@@ -162,16 +162,19 @@ class ListActivity : AppCompatActivity() {
         val sanitizedItems = items.map { it.trim() }.filter { it.isNotBlank() }
         if (sanitizedItems.isEmpty()) return
 
+        val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+        sdf.timeZone = TimeZone.getTimeZone("UTC")
         val now = System.currentTimeMillis()
+        
         val newItems = sanitizedItems.mapIndexed { index, itemName ->
-            val timestamp = Timestamp(Date(now + index * 1000L))
+            val timestampString = sdf.format(Date(now + index * 1000L))
             val autoId = db.collection("shopping_lists").document().id
-            autoId to ShoppingItem(
-                name = itemName,
-                addedBy = userEmail,  // Using sanitized email
-                addedAt = timestamp,
-                important = false,
-                pending = true
+            autoId to mapOf(
+                "name" to itemName,
+                "addedBy" to userEmail,
+                "addedAt" to timestampString,
+                "important" to false,
+                "pending" to true
             )
         }.toMap()
 

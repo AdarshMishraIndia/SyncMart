@@ -1,5 +1,6 @@
 package com.mana.syncmart
 
+// Timestamp is now handled as String
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -8,13 +9,10 @@ import android.view.ViewGroup
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.mana.syncmart.databinding.FragmentFinishedItemsBinding
 import com.mana.syncmart.databinding.LayoutMetadataBinding
-import java.text.SimpleDateFormat
-import java.util.*
 
 class FinishedItemsFragment : Fragment() {
 
@@ -74,7 +72,7 @@ class FinishedItemsFragment : Fragment() {
 
                         val name = rawValue["name"] as? String ?: ""
                         val addedBy = rawValue["addedBy"] as? String ?: ""
-                        val addedAt = rawValue["addedAt"] as? Timestamp
+                        val addedAt = rawValue["addedAt"] as? String ?: ""
                         val important = rawValue["important"] as? Boolean == true
                         val pending = rawValue["pending"] as? Boolean != false
 
@@ -87,7 +85,7 @@ class FinishedItemsFragment : Fragment() {
                                 pending = false
                             )
                         } else null
-                    }.sortedBy { it.second.addedAt ?: Timestamp.now() }
+                    }.sortedBy { it.second.addedAt }
 
                     updateItemList(finishedList)
                 }
@@ -104,19 +102,13 @@ class FinishedItemsFragment : Fragment() {
 
         dialogBinding.nameValue.text = item.name
         dialogBinding.addedByValue.text = item.addedBy
-        dialogBinding.addedAtValue.text = item.addedAt?.let { ts -> formatTimestamp(ts) } ?: "Unknown"
+        dialogBinding.addedAtValue.text = item.formattedDate
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogBinding.root)
             .create()
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
-    }
-
-    private fun formatTimestamp(timestamp: Timestamp): String {
-        val date = timestamp.toDate()
-        val formatter = SimpleDateFormat("h:mm a, d MMM yyyy", Locale.getDefault())
-        return formatter.format(date)
     }
 
     private fun showToast(message: String) {
