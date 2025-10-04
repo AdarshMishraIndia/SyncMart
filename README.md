@@ -10,7 +10,7 @@ SyncMart is a shopping list and inventory management app designed to simplify yo
 
 ## How It Works
 1. Create a new shopping list or select an existing one  
-2. Add items by typing or voice command  
+2. Add items by typing
 3. Organize items by category as you shop  
 4. Check off items as you add them to your cart  
 5. Share lists with family or roommates for collaborative shopping  
