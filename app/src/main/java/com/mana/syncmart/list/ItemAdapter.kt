@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.list
 
 import android.annotation.SuppressLint
 import android.view.Gravity
@@ -9,7 +9,9 @@ import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.mana.syncmart.R
 import com.mana.syncmart.databinding.ListElementRecyclerLayoutBinding
+import com.mana.syncmart.dataclass.ShoppingItem
 
 class ItemAdapter(
     var items: MutableList<Pair<String, ShoppingItem>>,

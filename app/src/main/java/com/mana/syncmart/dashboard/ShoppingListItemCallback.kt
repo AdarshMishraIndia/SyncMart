@@ -1,7 +1,8 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import android.annotation.SuppressLint
 import androidx.recyclerview.widget.DiffUtil
+import com.mana.syncmart.dataclass.ShoppingList
 
 @SuppressLint("DiffUtilEquals")
 class ShoppingListItemCallback : DiffUtil.ItemCallback<ShoppingList>() {

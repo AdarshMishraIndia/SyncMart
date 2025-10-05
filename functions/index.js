@@ -37,13 +37,16 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// --- Notification batching state ---
+const notificationBuffer = new Map(); // key: listId, value: {added:[], deleted:[], finished:[], important:[], timer:Timeout}
+const FLUSH_DELAY_MS = 5000;
+
 exports.onShoppingListUpdate = onDocumentUpdated("shopping_lists/{listId}", async (event) => {
-  // --- Extract snapshot data ---
+  const listId = event.params.listId;
   const beforeExists = event.data.before.exists;
   const afterExists = event.data.after.exists;
   const beforeData = beforeExists ? event.data.before.data() : {};
   const afterData = afterExists ? event.data.after.data() : {};
-
   const listName = afterData.listName || "Shopping List";
   const actorEmail = event.auth?.token?.email || null;
 
@@ -53,30 +56,27 @@ exports.onShoppingListUpdate = onDocumentUpdated("shopping_lists/{listId}", asyn
   // --- Helper: Compare two item objects by relevant fields ---
   function areItemsEqual(a, b) {
     return a.name === b.name &&
-           a.pending === b.pending &&
-           a.important === b.important &&
-           a.addedBy === b.addedBy;
+      a.pending === b.pending &&
+      a.important === b.important &&
+      a.addedBy === b.addedBy;
   }
 
-  // --- Identify changes ---
-  const addedItemKeys   = Object.keys(afterItems).filter(k => !(k in beforeItems));
+  const addedItemKeys = Object.keys(afterItems).filter(k => !(k in beforeItems));
   const deletedItemKeys = Object.keys(beforeItems).filter(k => !(k in afterItems));
   const modifiedItemKeys = Object.keys(beforeItems).filter(
     k => (k in afterItems) && !areItemsEqual(beforeItems[k], afterItems[k])
   );
 
-  // --- Collect all unique emails that we need display names for ---
   const emailsToLookup = new Set([actorEmail, afterData.owner]);
-  (afterData.accessEmails || []).forEach(email => email && emailsToLookup.add(email));
+  (afterData.accessEmails || []).forEach(e => e && emailsToLookup.add(e));
   addedItemKeys.forEach(k => afterItems[k]?.addedBy && emailsToLookup.add(afterItems[k].addedBy));
-  modifiedItemKeys.forEach(k => (afterItems[k]?.addedBy || actorEmail) && emailsToLookup.add(afterItems[k]?.addedBy || actorEmail));
+  modifiedItemKeys.forEach(k => afterItems[k]?.addedBy && emailsToLookup.add(afterItems[k].addedBy));
 
   // --- Display name cache & lookup ---
   const nameCache = new Map();
   async function getUserName(email) {
     if (!email) return "Someone";
     if (nameCache.has(email)) return nameCache.get(email);
-
     try {
       const record = await admin.auth().getUserByEmail(email);
       const displayName = record.displayName || "Someone";
@@ -88,92 +88,153 @@ exports.onShoppingListUpdate = onDocumentUpdated("shopping_lists/{listId}", asyn
       return "Someone";
     }
   }
-
-  // Pre-fetch all display names in parallel
   await Promise.all([...emailsToLookup].map(getUserName));
-
-  // --- Helper: Fast name lookup from cache ---
   const nameOf = email => nameCache.get(email) || "Someone";
 
-  // --- Helper: Send notification to all except one excluded email ---
-  async function notifyAllExcept(recipients, title, message, excludeEmail) {
-    const filteredRecipients = recipients.filter(e => e && e !== excludeEmail);
-    if (!filteredRecipients.length) return;
-    try {
-      await sendNotificationToEmails(filteredRecipients, title, message);
-    } catch (err) {
-      console.error("Notification error:", err);
-    }
-  }
-
-  // --- Build recipient list (owner + shared users) ---
   const listMembers = Array.from(new Set([...(afterData.accessEmails || []), afterData.owner].filter(Boolean)));
 
-  // --- 1) Handle new list creation ---
+  // --- Immediate notification for new list creation ---
   if (!beforeExists && afterExists) {
     const ownerName = nameOf(afterData.owner);
-    await notifyAllExcept(
-      afterData.accessEmails || [],
+    await sendNotificationToEmails(
+      (afterData.accessEmails || []),
       `Welcome to ${listName}!`,
-      `You have been invited to be a member by ${ownerName}.`,
-      actorEmail
+      `You have been invited to be a member by ${ownerName}.`
     );
-    return; // Nothing else to do for a brand-new list
+    return;
   }
 
-  // --- 2) Handle added items ---
+  // --- Collect changes for batching ---
+  if (!notificationBuffer.has(listId)) {
+    notificationBuffer.set(listId, {
+      added: [],
+      deleted: [],
+      finished: [],
+      important: [],
+      actorEmail,
+      listMembers,
+      listName,
+      timer: null
+    });
+  }
+  const buffer = notificationBuffer.get(listId);
+
+  // Add new items
   if (addedItemKeys.length > 0) {
-    const addedBy = afterItems[addedItemKeys[0]]?.addedBy || actorEmail;
-    await notifyAllExcept(
-      listMembers,
-      `New item(s) in ${listName}`,
-      `${nameOf(addedBy)} added ${addedItemKeys.length} new item${addedItemKeys.length > 1 ? "s" : ""}.`,
-      addedBy
-    );
+    buffer.added.push(...addedItemKeys.map(k => ({
+      name: afterItems[k].name,
+      addedBy: afterItems[k].addedBy || actorEmail
+    })));
   }
 
-  // --- 3) Handle deleted items ---
-  if (deletedItemKeys.length > 0) {
-    await notifyAllExcept(
-      listMembers,
-      `Deleted item(s) in ${listName}`,
-      `${nameOf(actorEmail)} deleted ${deletedItemKeys.length} item${deletedItemKeys.length > 1 ? "s" : ""}.`,
-      actorEmail
-    );
-  }
+// --- Add deleted items (only where pending === true)
+if (deletedItemKeys.length > 0) {
+  deletedItemKeys.forEach(k => {
+    const item = beforeItems[k];
+    if (item.pending === true) {  // ✅ CHANGED: now we notify only for pending items
+      buffer.deleted.push({ name: item.name, deletedBy: actorEmail });
+    }
+  });
+}
 
-  // --- 4) Handle modified items (pending/important changes) ---
-  for (const key of modifiedItemKeys) {
-    const beforeItem = beforeItems[key];
-    const afterItem = afterItems[key];
+  // Add modified items
+  modifiedItemKeys.forEach(k => {
+    const beforeItem = beforeItems[k];
+    const afterItem = afterItems[k];
     const modifiedBy = afterItem?.addedBy || actorEmail;
-    const modifierName = nameOf(modifiedBy);
 
     if (beforeItem.pending !== afterItem.pending && afterItem.pending === false) {
-      await notifyAllExcept(
-        listMembers,
-        `Finished item in ${listName}`,
-        `${modifierName} marked ${afterItem.name} as "finished".`,
-        modifiedBy
-      );
+      buffer.finished.push({ name: afterItem.name, modifiedBy });
     }
-
     if (beforeItem.important !== afterItem.important && afterItem.important === true) {
-      await notifyAllExcept(
-        listMembers,
-        `Important item in ${listName}`,
-        `${modifierName} marked ${afterItem.name} as "IMPORTANT".`,
-        modifiedBy
-      );
+      buffer.important.push({ name: afterItem.name, modifiedBy });
     }
-  }
+  });
 
-  // --- 5) Handle ownership transfer ---
+  // Ownership change is a single event -> send immediately
   if (beforeData.owner !== afterData.owner && afterData.owner && afterData.owner !== actorEmail) {
     await sendNotificationToEmails(
       [afterData.owner],
       `Ownership Changed of ${listName}`,
       `You are the new owner of ${listName}.`
     );
+  }
+
+  // --- Schedule batch flush if not already scheduled ---
+  if (!buffer.timer) {
+    buffer.timer = setTimeout(async () => {
+      await flushNotifications(listId);
+    }, FLUSH_DELAY_MS);
+  }
+
+  async function flushNotifications(listId) {
+    const buf = notificationBuffer.get(listId);
+    if (!buf) return;
+
+    const { added, deleted, finished, important, actorEmail, listMembers, listName } = buf;
+
+    async function notifyAllExcept(recipients, title, message, excludeEmail) {
+      const filtered = recipients.filter(e => e && e !== excludeEmail);
+      if (filtered.length) {
+        await sendNotificationToEmails(filtered, title, message);
+      }
+    }
+
+    if (added.length > 0) {
+      const addedBy = added[0].addedBy;
+      await notifyAllExcept(
+        listMembers,
+        `New item(s) in ${listName}`,
+        `${nameOf(addedBy)} added ${added.length} new item${added.length > 1 ? "s" : ""}.`,
+        addedBy
+      );
+    }
+
+    if (deleted.length > 0) {
+      await notifyAllExcept(
+        listMembers,
+        `Deleted item(s) in ${listName}`,
+        `${nameOf(actorEmail)} deleted ${deleted.length} item${deleted.length > 1 ? "s" : ""}.`,
+        actorEmail
+      );
+    }
+
+if (finished.length > 0) {
+  // Group finished items by modifier so we can send one notification per user per batch
+  const groupedByUser = finished.reduce((acc, f) => {
+    if (!acc[f.modifiedBy]) acc[f.modifiedBy] = [];
+    acc[f.modifiedBy].push(f.name);
+    return acc;
+  }, {});
+
+  for (const [modifiedBy, itemNames] of Object.entries(groupedByUser)) {
+    await notifyAllExcept(
+      listMembers,
+      `Finished item(s) in ${listName}`,
+      `${nameOf(modifiedBy)} marked ${itemNames.length} item${itemNames.length > 1 ? "s" : ""} as finished.`,
+      modifiedBy
+    );
+  }
+}
+
+if (important.length > 0) {
+  // Group important items by modifier (like finished items)
+  const groupedByUser = important.reduce((acc, imp) => {
+    if (!acc[imp.modifiedBy]) acc[imp.modifiedBy] = [];
+    acc[imp.modifiedBy].push(imp.name);
+    return acc;
+  }, {});
+
+  for (const [modifiedBy, itemNames] of Object.entries(groupedByUser)) {
+    await notifyAllExcept(
+      listMembers,
+      `Important item(s) in ${listName}`,
+      `${nameOf(modifiedBy)} marked ${itemNames.length} item${itemNames.length > 1 ? "s" : ""} as IMPORTANT.`,
+      modifiedBy
+    );
+  }
+}
+
+    notificationBuffer.delete(listId);
   }
 });

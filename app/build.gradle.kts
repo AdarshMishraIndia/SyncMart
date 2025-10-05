@@ -53,6 +53,7 @@ android {
 dependencies {
     // Dagger Hilt
     implementation(libs.hilt.android)
+    implementation(libs.androidx.foundation)
     kapt(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
     
@@ -85,8 +86,8 @@ dependencies {
     // Google Identity & Play Services
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
-    implementation(libs.play.services.auth)
     implementation(libs.google.identity)
+    implementation(libs.play.services.auth)
 
     // UI extras
     implementation(libs.circleimageview)

@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.friend
 
 import android.content.Context
 import android.content.res.ColorStateList
@@ -20,7 +20,7 @@ class FriendSelectionAdapter(
     private val selectedEmails: MutableSet<String>,
     private val onFriendChecked: (Friend, Boolean) -> Unit,
     private val showCheckBox: Boolean
-) : ArrayAdapter<Friend>(context, R.layout.friends_layout, friendsList) {
+) : ArrayAdapter<Friend>(context, com.mana.syncmart.R.layout.friends_layout, friendsList) {
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
         val binding: FriendsLayoutBinding
@@ -43,7 +43,8 @@ class FriendSelectionAdapter(
             setSpan(StyleSpan(Typeface.BOLD), 0, friend.name.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             append("\n")
             append(friend.email)
-            setSpan(StyleSpan(Typeface.ITALIC), friend.name.length + 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(StyleSpan(Typeface.ITALIC), friend.name.length + 1,
+                length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         binding.textViewNameEmail.text = spannable
 
@@ -67,7 +68,7 @@ class FriendSelectionAdapter(
 
 
     private fun updateCheckboxColor(checkBox: CheckBox, isChecked: Boolean) {
-        val colorResId = if (isChecked) R.color.green else R.color.red
+        val colorResId = if (isChecked) com.mana.syncmart.R.color.green else com.mana.syncmart.R.color.red
         checkBox.buttonTintList = ColorStateList.valueOf(ContextCompat.getColor(context, colorResId))
     }
 

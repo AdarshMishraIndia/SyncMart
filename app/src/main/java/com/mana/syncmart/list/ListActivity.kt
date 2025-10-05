@@ -1,10 +1,13 @@
-package com.mana.syncmart
+package com.mana.syncmart.list
 
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
+import android.view.WindowManager
+import android.view.inputmethod.InputMethodManager
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
@@ -12,6 +15,7 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import com.mana.syncmart.dataclass.ShoppingList
 import com.mana.syncmart.dashboard.ListManagementActivity
 import com.mana.syncmart.databinding.ActivityListBinding
 import com.mana.syncmart.databinding.DialogAddItemsBinding
@@ -20,6 +24,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.collections.get
 
 class ListActivity : AppCompatActivity() {
 
@@ -130,20 +135,20 @@ class ListActivity : AppCompatActivity() {
 
     private fun showAddItemsDialog() {
         val dialogBinding = DialogAddItemsBinding.inflate(layoutInflater)
-        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setView(dialogBinding.root)
             .create()
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
 
-        dialog.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
+        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
 
         dialog.show()
 
         dialogBinding.editTextTextMultiLine.requestFocus()
 
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
-        imm.showSoftInput(dialogBinding.editTextTextMultiLine, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.showSoftInput(dialogBinding.editTextTextMultiLine, InputMethodManager.SHOW_IMPLICIT)
 
         dialogBinding.btnSend.setOnClickListener {
             val items = dialogBinding.editTextTextMultiLine.text.toString()

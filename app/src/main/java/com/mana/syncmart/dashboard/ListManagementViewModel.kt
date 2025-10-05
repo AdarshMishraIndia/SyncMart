@@ -15,12 +15,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.mana.syncmart.ShoppingItem
-import com.mana.syncmart.ShoppingList
-import kotlinx.coroutines.CoroutineScope
+import com.mana.syncmart.dataclass.ShoppingItem
+import com.mana.syncmart.dataclass.ShoppingList
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -50,7 +47,6 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
     private val shoppingLists = mutableMapOf<String, ShoppingList>()
     private val realTimeListeners = mutableListOf<ListenerRegistration>()
     private val isConnectedFlow = MutableStateFlow(false)
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
     init {
         setupInternetMonitoring()
@@ -329,15 +325,23 @@ class ListManagementViewModel(application: Application) : AndroidViewModel(appli
         _uiState.value = _uiState.value?.copy(navigateToAuth = true)
     }
 
-    fun navigateToFriendActivity() { _uiState.value = _uiState.value?.copy(navigateToFriendActivity = true) }
-    fun navigateToEditProfile() { _uiState.value = _uiState.value?.copy(navigateToRegister = true) }
-    fun resetNavigateToAuth() { _uiState.value = _uiState.value?.copy(navigateToAuth = false) }
-    fun resetNavigateToFriendActivity() { _uiState.value = _uiState.value?.copy(navigateToFriendActivity = false) }
-    fun resetNavigateToRegister() { _uiState.value = _uiState.value?.copy(navigateToRegister = false) }
+    fun navigateToEditProfile() {
+        _uiState.value = _uiState.value?.copy(navigateToRegister = true)
+    }
 
-    override fun onCleared() {
-        realTimeListeners.forEach { it.remove() }
-        scope.cancel()
-        super.onCleared()
+    fun navigateToFriendActivity() {
+        _uiState.value = _uiState.value?.copy(navigateToFriendActivity = true)
+    }
+
+    fun resetNavigateToAuth() {
+        _uiState.value = _uiState.value?.copy(navigateToAuth = false)
+    }
+
+    fun resetNavigateToFriendActivity() {
+        _uiState.value = _uiState.value?.copy(navigateToFriendActivity = false)
+    }
+
+    fun resetNavigateToRegister() {
+        _uiState.value = _uiState.value?.copy(navigateToRegister = false)
     }
 }

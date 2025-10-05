@@ -1,39 +1,39 @@
 [versions]
 agp = "8.12.3"
-firebaseBom = "34.2.0"
-hiltAndroidGradlePlugin = "2.57.1"
+firebaseBom = "34.3.0"
+hiltAndroidGradlePlugin = "2.57.2"
 kotlin = "2.2.20"
 coreKtx = "1.17.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-lifecycleRuntimeKtx = "2.9.3"
+lifecycleRuntimeKtx = "2.9.4"
 activityCompose = "1.11.0"
-composeBom = "2025.09.00"
+composeBom = "2025.09.01"
 googleGmsGoogleServices = "4.4.3"
 firebaseAuth = "24.0.1"
-androidx-constraintlayout = "2.2.1"
+androidx_constraintlayout = "2.2.1"
 material = "1.13.0"
-firebaseFirestore = "26.0.0"
+firebaseFirestore = "26.0.1"
 firebaseMessaging = "24.1.2"
 firebaseInstallations = "18.0.0"
 circleimageview = "3.1.0"
-credentials = "1.5.0"
-credentialsPlayServicesAuth = "1.5.0"
 googleid = "1.1.1"
-play-services-auth = "21.4.0"
-lottie = "6.6.7"
-lifecycleViewmodelKtx = "2.9.3"
-lifecycleLivedataKtx = "2.9.3"
+lottie = "6.6.9"
+lifecycleViewmodelKtx = "2.9.4"
+lifecycleLivedataKtx = "2.9.4"
 coroutinesAndroid = "1.10.2"
-hilt = "2.57.1"
+hilt = "2.57.2"
 hiltNavigationCompose = "1.3.0"
-
+foundation = "1.9.2"
+playServicesAuth = "21.4.0"
+credentials = "1.6.0-beta01"
+credentialsPlayServicesAuth = "1.6.0-beta01"
 
 [libraries]
 # Core Android
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
-androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "androidx-constraintlayout" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "androidx_constraintlayout" }
 androidx-material = { module = "com.google.android.material:material", version.ref = "material" }
 
 # Testing
@@ -71,18 +71,20 @@ hilt-navigation-compose = { module = "androidx.hilt:hilt-navigation-compose", ve
 
 # Coroutines
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutinesAndroid" }
+
+# Other libs
 firebase-installations-ktx = { group = "com.google.firebase", name = "firebase-installations-ktx", version.ref = "firebaseInstallations" }
 circleimageview = { module = "de.hdodenhof:circleimageview", version.ref = "circleimageview" }
+
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialsPlayServicesAuth" }
-play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "play-services-auth" }
 google-identity = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 lottie = { group = "com.airbnb.android", name = "lottie", version.ref = "lottie" }
+androidx-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-gms-google-services = { id = "com.google.gms.google-services", version.ref = "googleGmsGoogleServices" }
-
-

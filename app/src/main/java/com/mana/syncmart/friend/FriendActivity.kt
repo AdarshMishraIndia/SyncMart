@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.friend
 
 import android.os.Bundle
 import android.util.Log
@@ -15,8 +15,10 @@ import com.google.android.material.navigation.NavigationView
 import com.google.firebase.firestore.*
 import androidx.appcompat.app.AlertDialog
 import com.google.firebase.auth.FirebaseAuth
+import com.mana.syncmart.R
 import com.mana.syncmart.dashboard.ListManagementActivity
 import com.mana.syncmart.auth.AuthActivity
+import kotlin.collections.iterator
 
 
 @Suppress("DEPRECATION")
@@ -135,11 +137,9 @@ class FriendActivity : AppCompatActivity() {
             Toast.makeText(this, "User not logged in!", Toast.LENGTH_SHORT).show()
         }
 
-        // Handle back button press correctly
+        // Simple back press handler
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val intent = Intent(this@FriendActivity, ListManagementActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
                 finish()
             }
         })

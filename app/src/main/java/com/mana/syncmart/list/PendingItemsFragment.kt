@@ -1,5 +1,6 @@
-package com.mana.syncmart
+package com.mana.syncmart.list
 
+import android.R
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
@@ -13,14 +14,18 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.airbnb.lottie.LottieAnimationView
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.FragmentPendingItemsBinding
 import com.mana.syncmart.databinding.LayoutMetadataBinding
-import com.mana.syncmart.databinding.DialogConfirmBinding
+import com.mana.syncmart.dataclass.ShoppingItem
 import java.text.SimpleDateFormat
-import java.util.*
-import com.google.firebase.auth.FirebaseAuth
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 
 @Suppress("DEPRECATION")
 class PendingItemsFragment : Fragment() {
@@ -201,7 +206,7 @@ class PendingItemsFragment : Fragment() {
             .setView(dialogBinding.root) // use dialogBinding.root
             .create()
 
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setBackgroundDrawableResource(R.color.transparent)
         dialog.show()
 
         // Set the title
@@ -217,7 +222,7 @@ class PendingItemsFragment : Fragment() {
                     db.collection("shopping_lists").document(it)
                         .update(
                             "items.$itemName",
-                            com.google.firebase.firestore.FieldValue.delete()
+                            FieldValue.delete()
                         )
                         .addOnFailureListener { e ->
                             showToast("Failed to delete $itemName: ${e.message}")
@@ -308,7 +313,7 @@ class PendingItemsFragment : Fragment() {
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogBinding.root)
             .create()
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setBackgroundDrawableResource(R.color.transparent)
         dialog.show()
     }
 

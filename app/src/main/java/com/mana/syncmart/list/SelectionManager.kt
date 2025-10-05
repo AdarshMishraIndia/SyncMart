@@ -1,4 +1,6 @@
-package com.mana.syncmart
+package com.mana.syncmart.list
+
+import com.mana.syncmart.dataclass.ShoppingItem
 
 class SelectionManager {
     private val selectedItems = mutableSetOf<String>()
@@ -26,4 +28,3 @@ class SelectionManager {
         }
     }
 }
-

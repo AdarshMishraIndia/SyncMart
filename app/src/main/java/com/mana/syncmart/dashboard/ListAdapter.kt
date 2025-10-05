@@ -1,18 +1,21 @@
-package com.mana.syncmart
+package com.mana.syncmart.dashboard
 
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mana.syncmart.R
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
+import com.mana.syncmart.dataclass.ShoppingList
 
 class ListAdapter(
     private val onSelectionChanged: (Boolean, Int) -> Unit,
     private val onListClicked: (ShoppingList) -> Unit
-) : ListAdapter<ShoppingList, ListAdapter.ViewHolder>(ShoppingListItemCallback()) {
+) : androidx.recyclerview.widget.ListAdapter<ShoppingList, ListAdapter.ViewHolder>(
+    ShoppingListItemCallback()
+) {
 
     private val selectedItems = mutableSetOf<String>()
     private var isSelectionMode = false
@@ -154,4 +157,3 @@ class ListAdapter(
     }
 
 }
-

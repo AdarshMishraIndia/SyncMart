@@ -24,14 +24,13 @@ import com.airbnb.lottie.LottieAnimationView
 import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.mana.syncmart.Friend
-import com.mana.syncmart.FriendActivity
-import com.mana.syncmart.FriendSelectionAdapter
-import com.mana.syncmart.ListActivity
-import com.mana.syncmart.ListAdapter
+import com.mana.syncmart.friend.Friend
+import com.mana.syncmart.friend.FriendActivity
+import com.mana.syncmart.friend.FriendSelectionAdapter
+import com.mana.syncmart.list.ListActivity
 import com.mana.syncmart.R
 import com.mana.syncmart.RegisterActivity
-import com.mana.syncmart.ShoppingList
+import com.mana.syncmart.dataclass.ShoppingList
 import com.mana.syncmart.auth.AuthActivity
 import com.mana.syncmart.databinding.ActivityListManagementBinding
 import com.mana.syncmart.databinding.DialogConfirmBinding
@@ -124,8 +123,8 @@ class ListManagementActivity : AppCompatActivity() {
                 viewModel.resetNavigateToAuth()
             }
             if (state.navigateToFriendActivity) {
-                startActivity(Intent(this, FriendActivity::class.java))
                 viewModel.resetNavigateToFriendActivity()
+                startActivity(Intent(this, FriendActivity::class.java))
             }
             if (state.navigateToRegister) {
                 val intent = Intent(this, RegisterActivity::class.java)

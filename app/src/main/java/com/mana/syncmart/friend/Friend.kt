@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.friend
 
 data class Friend(
     val name: String,

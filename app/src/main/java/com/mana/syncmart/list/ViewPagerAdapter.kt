@@ -1,4 +1,4 @@
-package com.mana.syncmart
+package com.mana.syncmart.list
 
 import androidx.fragment.app.Fragment
 import androidx.viewpager2.adapter.FragmentStateAdapter
