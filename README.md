@@ -3,6 +3,9 @@
 ## Overview
 SyncMart is a shopping list and inventory management app designed to simplify your grocery shopping experience. Keep track of your shopping needs, manage multiple lists, and never forget an item again with our intuitive interface.
 
+## App Demo
+Check out a quick demo of SyncMart [here](https://youtube.com/shorts/uZOs34Gx6Zg?feature=share).
+
 ## Key Features
 - **Unified Shopping Lists:** Create and manage multiple shopping lists for different stores or occasions  
 - **Real-time Sync:** Access your lists across all your Android devices with cloud synchronization  
