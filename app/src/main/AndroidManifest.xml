@@ -86,8 +86,19 @@
 
         <activity
             android:name=".dashboard.ListManagementActivity"
-            android:exported="false"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.SyncMart">
+            
+            <!-- Deep link intent filter for dashboard -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="myapp"
+                    android:host="dashboard" />
+            </intent-filter>
         </activity>
 
         <activity
@@ -98,8 +109,20 @@
 
         <activity
             android:name=".list.ListActivity"
-            android:exported="false"
+            android:exported="true"
+            android:launchMode="singleTop"
             android:theme="@style/Theme.SyncMart">
+            
+            <!-- Deep link intent filter for specific list -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="myapp"
+                    android:host="list"
+                    android:pathPrefix="/" />
+            </intent-filter>
         </activity>
 
         <activity

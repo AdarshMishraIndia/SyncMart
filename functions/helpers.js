@@ -37,19 +37,27 @@ async function getTokensForEmails(emails = []) {
  * @param {string[]} emails
  * @param {string} title
  * @param {string} body
+ * @param {string} deepLink - optional, defaults to dashboard
  */
-async function sendNotificationToEmails(emails = [], title, body) {
+async function sendNotificationToEmails(emails = [], title, body, deepLink) {
   const tokens = await getTokensForEmails(emails);
   if (!tokens.length) return;
 
   const messaging = admin.messaging();
+  const payload = {
+    notification: { title, body },
+    data: {
+      deepLink: deepLink || "myapp://dashboard" // default link
+    }
+  };
+
   const promises = [];
   for (let i = 0; i < tokens.length; i += 500) {
     const chunk = tokens.slice(i, i + 500);
     promises.push(
       messaging.sendEachForMulticast({
         tokens: chunk,
-        notification: { title, body },
+        ...payload
       })
     );
   }

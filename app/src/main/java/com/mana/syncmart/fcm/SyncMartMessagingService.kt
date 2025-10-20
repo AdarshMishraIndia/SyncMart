@@ -44,8 +44,9 @@ class SyncMartMessagingService : FirebaseMessagingService() {
         val type = data["type"]
         val targetId = data["target_id"]
         val listId = data["list_id"] // Check for list_id as well
+        val deepLink = data["deepLink"] // Extract deep link from FCM payload
         
-        Log.d(tag, "Extracted data - Type: $type, TargetID: $targetId, ListID: $listId")
+        Log.d(tag, "Extracted data - Type: $type, TargetID: $targetId, ListID: $listId, DeepLink: $deepLink")
         
         // If we have a notification payload, use it
         remoteMessage.notification?.let { notification ->
@@ -60,15 +61,27 @@ class SyncMartMessagingService : FirebaseMessagingService() {
             // If we have a list_id but no type, assume it's a NEW_ITEM_ADDED
             val effectiveType = if (effectiveTargetId != null && type == null) "NEW_ITEM_ADDED" else type
             
-            Log.d(tag, "Sending notification - Type: $effectiveType, Target: $effectiveTargetId")
+            Log.d(tag, "Sending notification - Type: $effectiveType, Target: $effectiveTargetId, DeepLink: $deepLink")
             
             notificationHelper.showNotification(
                 title = title,
                 message = message,
-                targetId = effectiveTargetId
+                targetId = effectiveTargetId,
+                deepLink = deepLink
             )
         } ?: run {
             Log.d(tag, "No notification payload, only data message")
+            
+            // Handle data-only messages with deep links
+            deepLink?.let {
+                Log.d(tag, "Data-only message with deep link: $it")
+                // You can still show a notification for data-only messages if needed
+                notificationHelper.showNotification(
+                    title = getString(R.string.app_name),
+                    message = "You have a new notification",
+                    deepLink = it
+                )
+            }
         }
     }
 

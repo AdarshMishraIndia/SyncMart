@@ -31,22 +31,35 @@ class NotificationHelper @Inject constructor(
      * @param title The title of the notification
      * @param message The message to display in the notification
      * @param targetId Optional target fragment to navigate to in the main activity
+     * @param deepLink Optional deep link URL for navigation (e.g., "myapp://list/abc123")
      */
     fun showNotification(
         title: String,
         message: String,
-        targetId: String? = null
+        targetId: String? = null,
+        deepLink: String? = null
     ) {
         // Create an intent that opens the main activity
         val intent = Intent(context, ListManagementActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("from_notification", true)
+            
+            // Add deep link if provided
+            deepLink?.let { putExtra("deep_link", it) }
+            
+            // Keep backward compatibility with targetId
             targetId?.let { putExtra("target_fragment", it) }
+            
+            // Use unique action to ensure each notification creates a distinct PendingIntent
+            action = "NOTIFICATION_ACTION_${System.currentTimeMillis()}"
         }
+        
+        // Use unique request code for each notification to ensure proper handling
+        val requestCode = System.currentTimeMillis().toInt()
         
         val pendingIntent = PendingIntent.getActivity(
             context,
-            notificationId++,
+            requestCode,
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
@@ -61,7 +74,7 @@ class NotificationHelper @Inject constructor(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(notificationId, notification)
+        notificationManager.notify(notificationId++, notification)
     }
 
     private fun createNotificationChannel() {

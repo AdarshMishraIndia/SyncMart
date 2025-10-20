@@ -35,6 +35,7 @@ import com.mana.syncmart.auth.AuthActivity
 import com.mana.syncmart.databinding.ActivityListManagementBinding
 import com.mana.syncmart.databinding.DialogConfirmBinding
 import com.mana.syncmart.databinding.DialogModifyListBinding
+import com.mana.syncmart.utils.DeepLinkHelper
 
 class ListManagementActivity : AppCompatActivity() {
     private lateinit var binding: ActivityListManagementBinding
@@ -55,20 +56,8 @@ class ListManagementActivity : AppCompatActivity() {
             title = "SyncMart"
         }
         
-        // Handle notification intent
-        if (intent?.getBooleanExtra("from_notification", false) == true) {
-            // If there's a target fragment specified in the notification
-            intent.getStringExtra("target_fragment")?.let { target ->
-                when (target) {
-                    // Add more cases here for different fragments if needed
-                    "friends" -> {
-                        // Navigate to friends fragment
-                        startActivity(Intent(this, FriendActivity::class.java))
-                    }
-                    // Add more targets as needed
-                }
-            }
-        }
+        // Handle deep link from notification or direct deep link
+        handleIncomingIntent(intent)
         
         // WhatsApp notification can be triggered manually via the send button
 
@@ -301,7 +290,32 @@ class ListManagementActivity : AppCompatActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         
-        // Handle notification intents when activity is brought to foreground
+        // Handle deep link when activity is brought to foreground
+        handleIncomingIntent(intent)
+    }
+    
+    /**
+     * Handles incoming intents including deep links from notifications
+     * Supports both notification extras and direct deep link URIs
+     */
+    private fun handleIncomingIntent(intent: Intent?) {
+        intent ?: return
+        
+        // Priority 1: Handle deep link from notification extra
+        val deepLink = intent.getStringExtra("deep_link")
+        if (!deepLink.isNullOrEmpty()) {
+            DeepLinkHelper.handleDeepLink(this, deepLink)
+            return
+        }
+        
+        // Priority 2: Handle direct deep link URI (when opened from external source)
+        if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
+            val uri = intent.data.toString()
+            DeepLinkHelper.handleDeepLink(this, uri)
+            return
+        }
+        
+        // Priority 3: Legacy notification handling (backward compatibility)
         if (intent.getBooleanExtra("from_notification", false)) {
             intent.getStringExtra("target_fragment")?.let { target ->
                 when (target) {

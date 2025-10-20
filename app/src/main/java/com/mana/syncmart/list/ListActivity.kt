@@ -2,6 +2,7 @@ package com.mana.syncmart.list
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.WindowManager
@@ -15,16 +16,15 @@ import com.google.android.material.tabs.TabLayoutMediator
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
-import com.mana.syncmart.dataclass.ShoppingList
 import com.mana.syncmart.dashboard.ListManagementActivity
 import com.mana.syncmart.databinding.ActivityListBinding
 import com.mana.syncmart.databinding.DialogAddItemsBinding
+import com.mana.syncmart.dataclass.ShoppingList
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
-import kotlin.collections.get
 
 class ListActivity : AppCompatActivity() {
 
@@ -33,6 +33,7 @@ class ListActivity : AppCompatActivity() {
     private var listId: String? = null
     private var currentListName = "Shopping List"
     private val menuDeleteId = 1001
+    private val tag = "ListActivity"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -69,16 +70,34 @@ class ListActivity : AppCompatActivity() {
     }
     
     private fun processIntent(intent: Intent) {
-        // Try to get list ID from either extra
+        // Priority 1: Handle direct deep link URI (myapp://list/<listId>)
+        if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
+            val uri = intent.data
+            Log.d(tag, "Processing deep link URI: $uri")
+            
+            if (uri?.scheme == "myapp" && uri.host == "list") {
+                val deepLinkListId = uri.lastPathSegment
+                if (!deepLinkListId.isNullOrEmpty() && deepLinkListId != listId) {
+                    Log.d(tag, "Extracted list ID from deep link: $deepLinkListId")
+                    listId = deepLinkListId
+                    loadListData(deepLinkListId)
+                    return
+                }
+            }
+        }
+        
+        // Priority 2: Try to get list ID from intent extras
         val newListId = intent.getStringExtra("LIST_ID") ?: intent.getStringExtra("list_id")
         
         if (!newListId.isNullOrEmpty()) {
             // Only update if this is a different list
             if (newListId != listId) {
+                Log.d(tag, "Loading list from intent extra: $newListId")
                 listId = newListId
                 loadListData(newListId)
             }
         } else if (listId == null) {
+            Log.w(tag, "No list ID found, using fallback")
             fallbackSetup()
         }
     }
