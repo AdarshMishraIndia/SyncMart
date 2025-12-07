@@ -1,6 +1,5 @@
 package com.mana.syncmart.list
 
-import android.R
 import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
@@ -56,8 +55,10 @@ class PendingItemsFragment : Fragment() {
 
         upArrow = binding.upArrowAnimation
         downArrow = binding.downArrowAnimation
-        upArrow.visibility = View.VISIBLE; downArrow.visibility = View.VISIBLE
-        upArrow.alpha = 0f; downArrow.alpha = 0f
+        upArrow.visibility = View.VISIBLE
+        downArrow.visibility = View.VISIBLE
+        upArrow.alpha = 0f
+        downArrow.alpha = 0f
 
         selectionManager = SelectionManager()
         setupRecyclerView()
@@ -65,21 +66,8 @@ class PendingItemsFragment : Fragment() {
 
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) {
             if (selectionManager.isSelectionActive()) {
-                // Get the currently selected item positions
-                val selectedPositions = selectionManager.getSelectedPositions(adapter.items)
-
-                // Clear selection in manager
-                selectionManager.clearSelection()
-
-                // Exit selection mode in the activity toolbar
-                (requireActivity() as? ListActivity)?.exitSelectionMode()
-
-                // Notify only the affected items to refresh
-                selectedPositions.forEach { pos ->
-                    adapter.notifyItemChanged(pos)
-                }
+                clearSelectionFromActivity()
             } else {
-                // Let the default back behavior happen
                 isEnabled = false
                 requireActivity().onBackPressed()
             }
@@ -96,13 +84,13 @@ class PendingItemsFragment : Fragment() {
             onSelectionChanged = { selectedCount ->
                 val activity = requireActivity() as? ListActivity
                 if (selectedCount == 1) {
-                    activity?.enterSelectionMode()  // first item selected
+                    activity?.enterSelectionMode()
                 }
-                activity?.updateSelectionCount(selectedCount)  // update count dynamically
+                activity?.updateSelectionCount(selectedCount)
             },
             onSelectionCleared = {
                 val activity = requireActivity() as? ListActivity
-                activity?.exitSelectionMode()  // selection cleared
+                activity?.exitSelectionMode()
             }
         )
 
@@ -152,8 +140,10 @@ class PendingItemsFragment : Fragment() {
         val updated = item.copy(important = !item.important)
         adapter.items[position] = name to updated
         adapter.notifyItemChanged(position)
-        listId?.let { db.collection("shopping_lists").document(it)
-            .update("items.$name.important", updated.important) }
+        listId?.let {
+            db.collection("shopping_lists").document(it)
+                .update("items.$name.important", updated.important)
+        }
     }
 
     private fun markItemAsFinished(itemName: String) {
@@ -168,12 +158,10 @@ class PendingItemsFragment : Fragment() {
             return
         }
 
-        // Format current time in ISO 8601 format with milliseconds and 'Z' timezone
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         val currentTimeFormatted = sdf.format(Date())
 
-        // Update item fields with current user's email
         listId?.let { listId ->
             db.collection("shopping_lists").document(listId)
                 .update(
@@ -192,30 +180,23 @@ class PendingItemsFragment : Fragment() {
         }
     }
 
-
-
     @SuppressLint("SetTextI18n")
     fun showConfirmDeleteDialog() {
         val activity = activity as? ListActivity ?: return
 
-        // Inflate your custom layout
         val dialogBinding = DialogConfirmBinding.inflate(activity.layoutInflater)
 
-        // Create the dialog
         val dialog = AlertDialog.Builder(requireContext())
-            .setView(dialogBinding.root) // use dialogBinding.root
+            .setView(dialogBinding.root)
             .create()
 
-        dialog.window?.setBackgroundDrawableResource(R.color.transparent)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
 
-        // Set the title
         dialogBinding.listName.text = "Delete selected items?"
 
-        // Cancel button
         dialogBinding.btnCancel.setOnClickListener { dialog.dismiss() }
 
-        // Delete button
         dialogBinding.btnDelete.setOnClickListener {
             adapter.deleteSelectedItems { itemName ->
                 listId?.let {
@@ -281,16 +262,13 @@ class PendingItemsFragment : Fragment() {
         }
     }
 
-
     @SuppressLint("SetTextI18n")
     private fun showItemInfoDialog(item: ShoppingItem, itemName: String) {
         val dialogBinding = LayoutMetadataBinding.inflate(layoutInflater)
         dialogBinding.nameValue.text = itemName
-        
-        // Set loading text initially
+
         dialogBinding.addedByValue.text = "Loading..."
-        
-        // Fetch user details from Firestore
+
         val addedByEmail = item.addedBy
         if (addedByEmail.isNotEmpty()) {
             db.collection("Users")
@@ -301,20 +279,28 @@ class PendingItemsFragment : Fragment() {
                     dialogBinding.addedByValue.text = username
                 }
                 .addOnFailureListener {
-                    // If there's an error, just show the email
                     dialogBinding.addedByValue.text = addedByEmail
                 }
         } else {
             dialogBinding.addedByValue.text = "Unknown"
         }
-        
+
         dialogBinding.addedAtValue.text = item.formattedDate
 
         val dialog = AlertDialog.Builder(requireContext())
             .setView(dialogBinding.root)
             .create()
-        dialog.window?.setBackgroundDrawableResource(R.color.transparent)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.show()
+    }
+
+    fun isSelectionActive(): Boolean = selectionManager.isSelectionActive()
+
+    fun clearSelectionFromActivity() {
+        val selectedPositions = selectionManager.getSelectedPositions(adapter.items)
+        selectionManager.clearSelection()
+        (requireActivity() as? ListActivity)?.exitSelectionMode()
+        selectedPositions.forEach { pos -> adapter.notifyItemChanged(pos) }
     }
 
     override fun onDestroyView() {

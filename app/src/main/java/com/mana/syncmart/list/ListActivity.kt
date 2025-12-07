@@ -42,23 +42,19 @@ class ListActivity : AppCompatActivity() {
         setSupportActionBar(binding.toolbar)
 
         binding.toolbar.title = "Loading..."
-        
-        // Process the initial intent
+
         processIntent(intent)
-        
+
         binding.addElementButton.setOnClickListener { showAddItemsDialog() }
         binding.shareListButton.setOnClickListener { sharePendingItems() }
         checkAndClearFinishedItems()
-        
-        // Set up back button to go to ListManagementActivity when coming from notification
+
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowHomeEnabled(true)
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                startActivity(Intent(this@ListActivity, ListManagementActivity::class.java)
-                    .apply { flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK })
-                finish()
+                handleBackNavigation()
             }
         })
     }
@@ -68,13 +64,34 @@ class ListActivity : AppCompatActivity() {
         setIntent(intent)
         processIntent(intent)
     }
-    
+
+    override fun onSupportNavigateUp(): Boolean {
+        handleBackNavigation()
+        return true
+    }
+
+    private fun handleBackNavigation() {
+        val pendingFragment = supportFragmentManager.findFragmentByTag("f0") as? PendingItemsFragment
+
+        if (pendingFragment?.isSelectionActive() == true) {
+            pendingFragment.clearSelectionFromActivity()
+        } else {
+            navigateToListManagement()
+        }
+    }
+
+    private fun navigateToListManagement() {
+        startActivity(Intent(this, ListManagementActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        })
+        finish()
+    }
+
     private fun processIntent(intent: Intent) {
-        // Priority 1: Handle direct deep link URI (myapp://list/<listId>)
         if (intent.action == Intent.ACTION_VIEW && intent.data != null) {
             val uri = intent.data
             Log.d(tag, "Processing deep link URI: $uri")
-            
+
             if (uri?.scheme == "myapp" && uri.host == "list") {
                 val deepLinkListId = uri.lastPathSegment
                 if (!deepLinkListId.isNullOrEmpty() && deepLinkListId != listId) {
@@ -85,12 +102,10 @@ class ListActivity : AppCompatActivity() {
                 }
             }
         }
-        
-        // Priority 2: Try to get list ID from intent extras
+
         val newListId = intent.getStringExtra("LIST_ID") ?: intent.getStringExtra("list_id")
-        
+
         if (!newListId.isNullOrEmpty()) {
-            // Only update if this is a different list
             if (newListId != listId) {
                 Log.d(tag, "Loading list from intent extra: $newListId")
                 listId = newListId
@@ -101,7 +116,7 @@ class ListActivity : AppCompatActivity() {
             fallbackSetup()
         }
     }
-    
+
     private fun loadListData(id: String) {
         db.collection("shopping_lists").document(id).get()
             .addOnSuccessListener { doc ->
@@ -159,7 +174,6 @@ class ListActivity : AppCompatActivity() {
             .create()
 
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-
         dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE)
 
         dialog.show()
@@ -189,7 +203,7 @@ class ListActivity : AppCompatActivity() {
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         val now = System.currentTimeMillis()
-        
+
         val newItems = sanitizedItems.mapIndexed { index, itemName ->
             val timestampString = sdf.format(Date(now + index * 1000L))
             val autoId = db.collection("shopping_lists").document().id
@@ -202,16 +216,14 @@ class ListActivity : AppCompatActivity() {
             )
         }.toMap()
 
-        // Update Firestore
         listId?.let { id ->
             db.collection("shopping_lists").document(id)
                 .set(mapOf("items" to newItems), SetOptions.merge())
                 .addOnFailureListener { e ->
-                    // Consider showing an error message to the user
+                    Log.e(tag, "Failed to add items", e)
                 }
         }
     }
-
 
     private fun sharePendingItems() {
         listId?.let { it ->

@@ -13,7 +13,8 @@
         android:layout_height="?attr/actionBarSize"
         android:background="?attr/colorPrimary"
         app:title="SyncMart"
-        app:titleTextColor="@android:color/white" />
+        app:titleTextColor="@android:color/white"
+        app:navigationIconTint="@android:color/white"/>
 
     <!-- Tab Layout for Switching Between Fragments -->
     <com.google.android.material.tabs.TabLayout
