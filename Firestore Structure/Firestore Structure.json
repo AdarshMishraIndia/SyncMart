@@ -1,0 +1,29 @@
+{
+  "shopping_lists": {
+    "{listId}": {
+      "listName": "string",
+      "owner": "string (email)",
+      "accessEmails": ["string (email)"],
+      "items": {
+        "{itemId}": {
+          "name": "string",
+          "addedBy": "string (email)",
+          "addedAt": "string (ISO 8601)",
+          "important": "boolean",
+          "pending": "boolean",
+          "active": "boolean",
+          "lastModified": "Timestamp"
+        }
+      },
+      "createdAt": "Timestamp",
+      "lastModified": "Timestamp",
+      "position": "number",
+      "active": "boolean"
+    }
+  },
+  "Users": {
+    "{userEmail}": {
+      "name": "string"
+    }
+  }
+}

@@ -9,5 +9,7 @@ data class ShoppingList(
     val owner: String = "",
     val items: Map<String, ShoppingItem> = emptyMap(),
     val createdAt: Timestamp = Timestamp.now(),
-    var position: Int = 0
+    var position: Int = 0,
+    val active: Boolean = true,
+    val lastModified: Timestamp? = null
 )

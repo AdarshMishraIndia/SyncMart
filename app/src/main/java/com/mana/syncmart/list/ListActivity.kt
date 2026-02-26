@@ -11,17 +11,14 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.core.content.edit
 import com.google.android.material.tabs.TabLayoutMediator
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.mana.syncmart.dashboard.ListManagementActivity
 import com.mana.syncmart.databinding.ActivityListBinding
 import com.mana.syncmart.databinding.DialogAddItemsBinding
-import com.mana.syncmart.dataclass.ShoppingList
 import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
@@ -47,7 +44,6 @@ class ListActivity : AppCompatActivity() {
 
         binding.addElementButton.setOnClickListener { showAddItemsDialog() }
         binding.shareListButton.setOnClickListener { sharePendingItems() }
-        checkAndClearFinishedItems()
 
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         supportActionBar?.setDisplayShowHomeEnabled(true)
@@ -72,7 +68,6 @@ class ListActivity : AppCompatActivity() {
 
     private fun handleBackNavigation() {
         val pendingFragment = supportFragmentManager.findFragmentByTag("f0") as? PendingItemsFragment
-
         if (pendingFragment?.isSelectionActive() == true) {
             pendingFragment.clearSelectionFromActivity()
         } else {
@@ -123,6 +118,17 @@ class ListActivity : AppCompatActivity() {
                 if (doc.exists()) {
                     currentListName = doc.getString("listName") ?: "Shopping List"
                     binding.toolbar.title = currentListName
+
+                    // Backfill list-level lastModified if missing
+                    if (doc.getTimestamp("lastModified") == null) {
+                        val fallback = doc.getTimestamp("createdAt") ?: Timestamp.now()
+                        db.collection("shopping_lists").document(id)
+                            .update("lastModified", fallback)
+                            .addOnFailureListener { e ->
+                                Log.w(tag, "Failed to backfill list lastModified: ${e.message}")
+                            }
+                    }
+
                     setupViewPager(id)
                 } else fallbackSetup()
             }
@@ -194,46 +200,51 @@ class ListActivity : AppCompatActivity() {
     private fun addItemsToList(items: List<String>) {
         if (items.isEmpty()) return
 
-        val user = FirebaseAuth.getInstance().currentUser
-        val userEmail = user?.email ?: "unknown"
-
+        val userEmail = FirebaseAuth.getInstance().currentUser?.email ?: "unknown"
         val sanitizedItems = items.map { it.trim() }.filter { it.isNotBlank() }
         if (sanitizedItems.isEmpty()) return
 
+        val id = listId ?: return
+
         val sdf = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
         sdf.timeZone = TimeZone.getTimeZone("UTC")
-        val now = System.currentTimeMillis()
+        val nowMs = System.currentTimeMillis()
+        val listTimestamp = Timestamp.now()
 
-        val newItems = sanitizedItems.mapIndexed { index, itemName ->
-            val timestampString = sdf.format(Date(now + index * 1000L))
+        // Dot-notation keys merge each item field individually — does NOT overwrite existing items
+        val updates = hashMapOf<String, Any>("lastModified" to listTimestamp)
+
+        sanitizedItems.forEachIndexed { index, itemName ->
+            val itemMs = nowMs + index * 1000L
+            val timestampString = sdf.format(Date(itemMs))
+            val itemTimestamp = Timestamp(Date(itemMs))
             val autoId = db.collection("shopping_lists").document().id
-            autoId to mapOf(
-                "name" to itemName,
-                "addedBy" to userEmail,
-                "addedAt" to timestampString,
-                "important" to false,
-                "pending" to true
-            )
-        }.toMap()
 
-        listId?.let { id ->
-            db.collection("shopping_lists").document(id)
-                .set(mapOf("items" to newItems), SetOptions.merge())
-                .addOnFailureListener { e ->
-                    Log.e(tag, "Failed to add items", e)
-                }
+            updates["items.$autoId.name"] = itemName
+            updates["items.$autoId.addedBy"] = userEmail
+            updates["items.$autoId.addedAt"] = timestampString
+            updates["items.$autoId.important"] = false
+            updates["items.$autoId.pending"] = true
+            updates["items.$autoId.active"] = true
+            updates["items.$autoId.lastModified"] = itemTimestamp
         }
+
+        db.collection("shopping_lists").document(id)
+            .update(updates)
+            .addOnFailureListener { e -> Log.e(tag, "Failed to add items", e) }
     }
 
     private fun sharePendingItems() {
-        listId?.let { it ->
-            db.collection("shopping_lists").document(it).get().addOnSuccessListener { doc ->
+        listId?.let { id ->
+            db.collection("shopping_lists").document(id).get().addOnSuccessListener { doc ->
                 val items = (doc["items"] as? Map<*, *>)?.mapNotNull { entry ->
                     val map = entry.value as? Map<*, *> ?: return@mapNotNull null
-                    val pending = map["pending"] as? Boolean != false
+                    val active = map["active"] as? Boolean ?: true
+                    val pending = map["pending"] as? Boolean ?: true
                     val name = map["name"] as? String ?: return@mapNotNull null
-                    if (pending) name else null
+                    if (active && pending) name else null
                 } ?: emptyList()
+
                 if (items.isNotEmpty()) {
                     startActivity(Intent.createChooser(Intent().apply {
                         action = Intent.ACTION_SEND
@@ -241,42 +252,6 @@ class ListActivity : AppCompatActivity() {
                         putExtra(Intent.EXTRA_TEXT, items.joinToString("\n") { "• $it" })
                     }, "Share List"))
                 }
-            }
-        }
-    }
-
-    private fun checkAndClearFinishedItems() {
-        val id = listId ?: return
-        val prefs = getSharedPreferences("SyncMartPrefs", MODE_PRIVATE)
-        val key = "lastClearedDate_$id"
-        val now = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        val last = prefs.getString(key, null) ?: run { prefs.edit { putString(key, now) }; return }
-
-        try {
-            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val days = ((sdf.parse(now)!!.time - sdf.parse(last)!!.time) / (1000 * 60 * 60 * 24)).toInt()
-            val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-            if (days >= 2 || (days == 1 && hour >= 23)) {
-                clearFinishedItems(key, now)
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun clearFinishedItems(key: String, date: String) {
-        listId?.let { listId ->
-            val docRef = db.collection("shopping_lists").document(listId)
-            docRef.get().addOnSuccessListener { doc ->
-                val shoppingList = doc.toObject(ShoppingList::class.java)
-                val items = shoppingList?.items ?: emptyMap()
-
-                val updatedItems = items.filterValues { it.pending }
-
-                docRef.update("items", updatedItems)
-                    .addOnSuccessListener {
-                        getSharedPreferences("SyncMartPrefs", MODE_PRIVATE).edit {
-                            putString(key, date)
-                        }
-                    }
             }
         }
     }
