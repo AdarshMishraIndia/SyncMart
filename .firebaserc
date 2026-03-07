@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "syncmart-2db9f"
-  }
+    "default": "syncmart-2db9f",
+    "SyncMart": "syncmart-2db9f"
+  },
+  "targets": {},
+  "etags": {}
 }

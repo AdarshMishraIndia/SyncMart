@@ -23,7 +23,8 @@
   },
   "Users": {
     "{userEmail}": {
-      "name": "string"
+      "name": "string",
+      "fcmToken": ["string (fcmToken)"]
     }
   }
 }

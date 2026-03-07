@@ -5,8 +5,6 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.gms.google.services)
-    kotlin("kapt")
-    id("dagger.hilt.android.plugin")
 }
 
 android {
@@ -20,7 +18,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        testInstrumentationRunner = "com.mana.syncmart.HiltTestRunner"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["clearPackageData"] = "true"
     }
 
@@ -54,13 +52,7 @@ android {
 }
 
 dependencies {
-    // Dagger Hilt
-    implementation(libs.hilt.android)
-    implementation(libs.androidx.foundation)
-    kapt(libs.hilt.compiler)
-    implementation(libs.hilt.navigation.compose)
-    
-    // Firebase BOM
+    // Firebase BOM — manages all firebase-* versions below
     implementation(platform(libs.firebase.bom))
 
     // AndroidX
@@ -79,12 +71,13 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.androidx.foundation)
 
-    // Firebase
+    // Firebase — main modules only (KTX modules removed from BOM v34+)
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
-    implementation(libs.firebase.messaging.ktx)
-    implementation(libs.firebase.installations.ktx)
+    implementation(libs.firebase.messaging)
+    implementation(libs.firebase.installations)
 
     // Google Identity & Play Services
     implementation(libs.androidx.credentials)

@@ -9,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mana.syncmart.R
 import com.mana.syncmart.databinding.ListRecyclerLayoutBinding
 import com.mana.syncmart.dataclass.ShoppingList
+import androidx.core.graphics.toColorInt
 
 class ListAdapter(
     private val onSelectionChanged: (Boolean, Int) -> Unit,
@@ -43,10 +44,42 @@ class ListAdapter(
         }
 
         private fun updateNotifBubble(item: ShoppingList) {
-            val pendingCount = item.items.values.count { it.pending } // Count only pending items
+            val pendingItems = item.items.values.filter { it.pending && it.active }
+            val pendingCount = pendingItems.size
+
             binding.notifBubble.apply {
                 visibility = if (pendingCount > 0) View.VISIBLE else View.GONE
                 text = pendingCount.toString()
+                if (pendingCount > 0) {
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(getBubbleColor(pendingItems).toColorInt())
+                    setShadowLayer(3f, 0f, 0f, android.graphics.Color.BLACK)
+                    paint.style = android.graphics.Paint.Style.FILL_AND_STROKE
+                    paint.strokeWidth = 2f
+                }
+            }
+        }
+
+        private fun getBubbleColor(pendingItems: List<com.mana.syncmart.dataclass.ShoppingItem>): String {
+            val now = System.currentTimeMillis()
+            val h24 = 24 * 60 * 60 * 1000L
+            val h48 = 48 * 60 * 60 * 1000L
+
+            var hasGreen = false
+            var hasYellow = false
+
+            for (item in pendingItems) {
+                val lastModifiedMs = item.lastModified?.toDate()?.time ?: continue // null = skip (treated as red)
+                val age = now - lastModifiedMs
+                when {
+                    age <= h24 -> hasGreen = true
+                    age <= h48 -> hasYellow = true
+                }
+            }
+
+            return when {
+                hasGreen -> "#4CAF50"   // Green
+                hasYellow -> "#FFC107"  // Yellow/Amber
+                else -> "#F44336"       // Red
             }
         }
 
